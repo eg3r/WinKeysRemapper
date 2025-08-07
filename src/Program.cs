@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Windows.Forms;
+using System.Threading;
 using WinKeysRemapper.Configuration;
 using WinKeysRemapper.Input;
 
@@ -67,8 +67,10 @@ namespace WinKeysRemapper
                     Environment.Exit(0);
                 };
                 
-                // Keep the application running
-                Application.Run(); // Use Windows Forms message loop for hook processing
+                // Keep the application running with a simple wait loop
+                // No need for Windows Forms message loop - the hook uses its own thread
+                Console.WriteLine("Application running. Press Ctrl+C to exit.");
+                Thread.Sleep(Timeout.Infinite);
             }
             catch (Exception ex)
             {
