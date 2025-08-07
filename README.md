@@ -25,7 +25,7 @@ A high-performance Windows keyboard input remapper that allows you to remap spec
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/WinKeysRemapper.git
+   git clone https://github.com/eg3r/WinKeysRemapper.git
    cd WinKeysRemapper
    ```
 
@@ -112,7 +112,7 @@ The remapper supports 200+ keys including:
 ### Building from Source
 ```bash
 # Clone and build
-git clone https://github.com/yourusername/WinKeysRemapper.git
+git clone https://github.com/eg3r/WinKeysRemapper.git
 cd WinKeysRemapper
 dotnet build src/WinKeysRemapper.csproj
 
@@ -137,7 +137,7 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 ## 🐛 Issues
 
-If you encounter any issues or have feature requests, please [open an issue](https://github.com/yourusername/WinKeysRemapper/issues) on GitHub.
+If you encounter any issues or have feature requests, please [open an issue](https://github.com/eg3r/WinKeysRemapper/issues) on GitHub.
 
 ## 🙏 Acknowledgments
 
