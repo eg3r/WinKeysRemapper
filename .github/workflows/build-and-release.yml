@@ -84,8 +84,10 @@ jobs:
       run: |
         $date = Get-Date -Format "yyyy.MM.dd"
         $shortSha = "${{ github.sha }}".Substring(0, 7)
-        $version = "v$date-$shortSha"
+        $runNumber = "${{ github.run_number }}"
+        $version = "v$date-build$runNumber"
         echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "SHORT_SHA=$shortSha" >> $env:GITHUB_OUTPUT
         echo "Generated version: $version"
 
     - name: Check if release exists
@@ -93,29 +95,39 @@ jobs:
       run: |
         $version = "${{ steps.version.outputs.VERSION }}"
         try {
-          $release = gh release view $version --json id
+          $release = gh release view $version --json id 2>$null
           echo "EXISTS=true" >> $env:GITHUB_OUTPUT
-          echo "Release $version already exists"
+          echo "Release $version already exists - will update"
         }
         catch {
           echo "EXISTS=false" >> $env:GITHUB_OUTPUT
-          echo "Release $version does not exist, will create"
+          echo "Release $version does not exist - will create new"
         }
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create Release
-      if: steps.check_release.outputs.EXISTS == 'false'
+    - name: Delete existing release if it exists
+      if: steps.check_release.outputs.EXISTS == 'true'
       run: |
         $version = "${{ steps.version.outputs.VERSION }}"
+        echo "Deleting existing release $version to update with new build..."
+        gh release delete $version --yes
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create Release
+      run: |
+        $version = "${{ steps.version.outputs.VERSION }}"
+        $shortSha = "${{ steps.version.outputs.SHORT_SHA }}"
         $releaseNotes = @"
         # WinKeysRemapper $version
         
-        ## 🚀 What's New
-        - Latest build from main branch
+        ## 🚀 Latest Build from Main Branch
         - High-performance Windows keyboard remapping
-        - PowerToys-inspired architecture
-        - Support for 200+ keys
+        - PowerToys-inspired architecture  
+        - Support for 200+ keys including function keys, media keys, numpad
+        - Application-specific targeting with JSON configuration
+        - Optimized single-file executables with trimming enabled
         
         ## 📦 Downloads
         - **Windows x64**: For 64-bit Windows systems (recommended)
@@ -124,14 +136,15 @@ jobs:
         ## 🛠️ Installation
         1. Download the appropriate version for your system
         2. Extract the ZIP file
-        3. Run WinKeysRemapper.exe
+        3. Run WinKeysRemapper.exe as Administrator
         4. Configure key mappings in key_mappings.json
         
         ## 📋 Requirements
         - Windows 10/11
         - Administrator privileges (for keyboard hooks)
         
-        **Commit:** ${{ github.sha }}
+        **Commit:** $shortSha
+        **Build Number:** ${{ github.run_number }}
         **Build Date:** $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
         "@
         
