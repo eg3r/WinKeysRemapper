@@ -1,0 +1,21 @@
+{
+  "TargetApplication": "notepad",
+  "KeyMappings": {
+    "A": "LeftArrow",
+    "D": "RightArrow", 
+    "W": "UpArrow",
+    "S": "DownArrow",
+    "1": "E",
+    "2": "Q",
+    "3": "R",
+    "Space": "Enter",
+    "F1": "Escape",
+    "Tab": "Shift",
+    "Z": "Ctrl",
+    "X": "Alt",
+    "C": "Home",
+    "V": "End",
+    "B": "PageUp",
+    "N": "PageDown"
+  }
+}
