@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+jobs:
+  build:
+    runs-on: windows-latest  # Required: App uses Windows APIs (user32.dll, kernel32.dll)
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Build x64
+      run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x64 --self-contained -o artifacts/win-x64
+      
+    - name: Build x86  
+      run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x86 --self-contained -o artifacts/win-x86
+      
+    - name: Build Portable
+      run: dotnet publish src/WinKeysRemapper.csproj -c Release --no-self-contained -o artifacts/portable
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: WinKeysRemapper-builds
+        path: artifacts/
+        retention-days: 30

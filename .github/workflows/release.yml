@@ -1,0 +1,47 @@
+name: Tagged Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggered when you push a version tag like v1.0.0
+
+jobs:
+  release:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Extract version from tag
+      id: version
+      run: |
+        $version = "${{ github.ref_name }}"
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "Version: $version"
+    
+    - name: Build x64
+      run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x64 --self-contained -o artifacts/win-x64 -p:Version=${{ steps.version.outputs.version }}
+      
+    - name: Build x86  
+      run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x86 --self-contained -o artifacts/win-x86 -p:Version=${{ steps.version.outputs.version }}
+      
+    - name: Build Portable
+      run: dotnet publish src/WinKeysRemapper.csproj -c Release --no-self-contained -o artifacts/portable -p:Version=${{ steps.version.outputs.version }}
+    
+    - name: Create ZIP files
+      run: |
+        Compress-Archive -Path "artifacts/win-x64/*" -DestinationPath "WinKeysRemapper-${{ steps.version.outputs.version }}-x64.zip" -Force
+        Compress-Archive -Path "artifacts/win-x86/*" -DestinationPath "WinKeysRemapper-${{ steps.version.outputs.version }}-x86.zip" -Force  
+        Compress-Archive -Path "artifacts/portable/*" -DestinationPath "WinKeysRemapper-${{ steps.version.outputs.version }}-portable.zip" -Force
+    
+    - name: Create Release
+      run: |
+        gh release create ${{ github.ref_name }} `
+          --title "WinKeysRemapper ${{ steps.version.outputs.version }}" `
+          --notes "Release ${{ steps.version.outputs.version }}" `
+          "WinKeysRemapper-${{ steps.version.outputs.version }}-x64.zip" `
+          "WinKeysRemapper-${{ steps.version.outputs.version }}-x86.zip" `
+          "WinKeysRemapper-${{ steps.version.outputs.version }}-portable.zip"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
