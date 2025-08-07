@@ -8,8 +8,8 @@ on:
     branches: [ main ]
 
 env:
-  DOTNET_VERSION: '8.0.x'
   PROJECT_PATH: 'src/WinKeysRemapper.csproj'
+  # Note: .NET 8 is pre-installed on windows-latest runners, no setup needed
 
 jobs:
   build:
@@ -21,10 +21,8 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+    - name: Verify .NET version
+      run: dotnet --version
 
     - name: Restore dependencies
       run: dotnet restore ${{ env.PROJECT_PATH }}
@@ -158,10 +156,8 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
+    - name: Verify .NET version
+      run: dotnet --version
 
     - name: Restore dependencies
       run: dotnet restore ${{ env.PROJECT_PATH }}
