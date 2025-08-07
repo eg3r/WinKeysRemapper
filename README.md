@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![.NET](https://img.shields.io/badge/.NET-8.0-blue.svg)](https://dotnet.microsoft.com/download/dotnet/8.0)
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
+[![GitHub release](https://img.shields.io/github/v/release/eg3r/WinKeysRemapper)](https://github.com/eg3r/WinKeysRemapper/releases/latest)
 
 A high-performance Windows keyboard input remapper that allows you to remap specific keys for targeted applications. Built with PowerToys-inspired architecture for minimal system impact.
 

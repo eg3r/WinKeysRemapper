@@ -1,0 +1,171 @@
+name: Tagged Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.0.0, v2.1.3, etc.
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  PROJECT_PATH: 'src/WinKeysRemapper.csproj'
+
+jobs:
+  tagged-release:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        $tag = "${{ github.ref_name }}"
+        echo "VERSION=$tag" >> $env:GITHUB_OUTPUT
+        echo "Version: $tag"
+
+    - name: Update version in project file
+      run: |
+        $version = "${{ steps.version.outputs.VERSION }}".TrimStart('v')
+        $projectFile = "${{ env.PROJECT_PATH }}"
+        $content = Get-Content $projectFile -Raw
+        $content = $content -replace '<Version>.*</Version>', "<Version>$version</Version>"
+        $content = $content -replace '<AssemblyVersion>.*</AssemblyVersion>', "<AssemblyVersion>$version</AssemblyVersion>"
+        $content = $content -replace '<FileVersion>.*</FileVersion>', "<FileVersion>$version</FileVersion>"
+        Set-Content $projectFile $content
+        echo "Updated project file with version $version"
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.PROJECT_PATH }}
+
+    - name: Build Release
+      run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+
+    - name: Run tests (if any)
+      run: dotnet test --configuration Release --no-build --verbosity normal
+      continue-on-error: true
+
+    - name: Publish Windows x64
+      run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --runtime win-x64 --self-contained true --output ./publish/win-x64 -p:PublishSingleFile=true -p:PublishTrimmed=true
+
+    - name: Publish Windows x86
+      run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --runtime win-x86 --self-contained true --output ./publish/win-x86 -p:PublishSingleFile=true -p:PublishTrimmed=true
+
+    - name: Publish Portable (Framework Dependent)
+      run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --output ./publish/portable
+
+    - name: Create release packages
+      run: |
+        # Create artifacts directory
+        mkdir artifacts
+        
+        # Package x64 version
+        Compress-Archive -Path "./publish/win-x64/*" -DestinationPath "./artifacts/WinKeysRemapper-${{ steps.version.outputs.VERSION }}-win-x64.zip"
+        
+        # Package x86 version
+        Compress-Archive -Path "./publish/win-x86/*" -DestinationPath "./artifacts/WinKeysRemapper-${{ steps.version.outputs.VERSION }}-win-x86.zip"
+        
+        # Package portable version
+        Compress-Archive -Path "./publish/portable/*" -DestinationPath "./artifacts/WinKeysRemapper-${{ steps.version.outputs.VERSION }}-portable.zip"
+        
+        # Copy documentation
+        Copy-Item "README.md" "./artifacts/"
+        Copy-Item "LICENSE" "./artifacts/"
+        Copy-Item "config/key_mappings_example.json" "./artifacts/"
+
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        $version = "${{ steps.version.outputs.VERSION }}"
+        $releaseNotes = @"
+        # WinKeysRemapper $version
+        
+        ## 🎉 Official Release
+        
+        This is an official versioned release of WinKeysRemapper, a high-performance Windows keyboard input remapper with application-specific targeting.
+        
+        ## ✨ Features
+        - 🎯 **Application-Specific Remapping** - Target specific applications
+        - ⚡ **High Performance** - PowerToys-inspired architecture  
+        - 🔧 **200+ Supported Keys** - Function keys, media keys, numpad, symbols
+        - 📝 **JSON Configuration** - Easy-to-edit configuration files
+        - 🚀 **Low-Level Hooks** - Direct Windows API integration
+        
+        ## 📦 Download Options
+        
+        | Package | Description | Recommended For |
+        |---------|-------------|-----------------|
+        | **win-x64** | Self-contained 64-bit | Most Windows 10/11 users |
+        | **win-x86** | Self-contained 32-bit | Older or 32-bit systems |
+        | **portable** | Requires .NET 8.0 Runtime | Developers/smaller download |
+        
+        ## 🚀 Quick Start
+        
+        1. Download the appropriate package for your system
+        2. Extract the ZIP file to a folder
+        3. Run **WinKeysRemapper.exe** as Administrator
+        4. Edit **key_mappings.json** to configure your key mappings
+        5. Restart the application to apply changes
+        
+        ## 📋 System Requirements
+        
+        - **Windows 10/11** (64-bit recommended)
+        - **Administrator privileges** (required for keyboard hooks)
+        - **.NET 8.0 Runtime** (only for portable version)
+        
+        ## 🛠️ Configuration Example
+        
+        ```json
+        {
+          "TargetApplication": "notepad",
+          "KeyMappings": {
+            "A": "LeftArrow",
+            "D": "RightArrow", 
+            "W": "UpArrow",
+            "S": "DownArrow"
+          }
+        }
+        ```
+        
+        ## 🐛 Issues & Support
+        
+        Found a bug or have a feature request? Please [open an issue](https://github.com/eg3r/WinKeysRemapper/issues).
+        
+        ---
+        
+        **Full Changelog**: https://github.com/eg3r/WinKeysRemapper/commits/$version
+        "@
+        
+        # Save to file for release creation
+        $releaseNotes | Out-File -FilePath "release-notes.md" -Encoding UTF8
+
+    - name: Create GitHub Release
+      run: |
+        $version = "${{ steps.version.outputs.VERSION }}"
+        
+        gh release create $version `
+          --title "WinKeysRemapper $version" `
+          --notes-file "release-notes.md" `
+          --draft=false `
+          --prerelease=false `
+          ./artifacts/WinKeysRemapper-$version-win-x64.zip `
+          ./artifacts/WinKeysRemapper-$version-win-x86.zip `
+          ./artifacts/WinKeysRemapper-$version-portable.zip `
+          ./artifacts/README.md `
+          ./artifacts/LICENSE `
+          ./artifacts/key_mappings_example.json
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: WinKeysRemapper-Release-${{ steps.version.outputs.VERSION }}
+        path: artifacts/

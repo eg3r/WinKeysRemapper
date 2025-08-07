@@ -6,6 +6,24 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <PlatformTarget>AnyCPU</PlatformTarget>
+    
+    <!-- Version Information -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0</AssemblyVersion>
+    <FileVersion>1.0.0</FileVersion>
+    
+    <!-- Assembly Metadata -->
+    <AssemblyTitle>WinKeysRemapper</AssemblyTitle>
+    <AssemblyDescription>High-performance Windows keyboard input remapper with application-specific targeting</AssemblyDescription>
+    <AssemblyCompany>WinKeysRemapper</AssemblyCompany>
+    <AssemblyProduct>WinKeysRemapper</AssemblyProduct>
+    <Copyright>Copyright © 2025 WinKeysRemapper</Copyright>
+    
+    <!-- Publishing Options -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
   </PropertyGroup>
 
   <ItemGroup>
