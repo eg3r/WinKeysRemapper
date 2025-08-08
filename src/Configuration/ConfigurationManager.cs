@@ -21,6 +21,11 @@ namespace WinKeysRemapper.Configuration
             _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ConfigFileName);
         }
 
+        public string GetConfigPath()
+        {
+            return _configPath;
+        }
+
         public KeyMappingConfig LoadConfig()
         {
             try

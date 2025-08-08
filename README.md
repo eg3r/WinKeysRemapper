@@ -56,6 +56,7 @@ WinKeysRemapper features a clean system tray interface that keeps it running qui
 - **Tray Icon** - Look for the WinKeysRemapper icon in your system tray (bottom-right corner of your screen)
 - **Context Menu** - Right-click the tray icon to access application controls:
   - **Reload Configuration** - Instantly reload your `key_mappings.json` file without restarting the app
+  - **Open Config** - Open the configuration file with your default JSON editor (e.g., VS Code, Notepad++)
   - **Exit** - Cleanly shutdown the application and remove the keyboard hook
 
 ### Admin Privileges
