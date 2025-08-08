@@ -36,6 +36,20 @@ jobs:
     
     - name: Create ZIP files
       run: |
+        # Copy documentation to each build folder
+        Copy-Item "README.md" -Destination "artifacts/win-x64/" -Force
+        Copy-Item "docs/installation.md" -Destination "artifacts/win-x64/" -Force
+        Copy-Item "docs/windows-security-warning.md" -Destination "artifacts/win-x64/" -Force
+        
+        Copy-Item "README.md" -Destination "artifacts/win-x86/" -Force
+        Copy-Item "docs/installation.md" -Destination "artifacts/win-x86/" -Force
+        Copy-Item "docs/windows-security-warning.md" -Destination "artifacts/win-x86/" -Force
+        
+        Copy-Item "README.md" -Destination "artifacts/portable/" -Force
+        Copy-Item "docs/installation.md" -Destination "artifacts/portable/" -Force
+        Copy-Item "docs/windows-security-warning.md" -Destination "artifacts/portable/" -Force
+        
+        # Create ZIP files
         Compress-Archive -Path "artifacts/win-x64/*" -DestinationPath "WinKeysRemapper-${{ steps.version.outputs.version }}-x64.zip" -Force
         Compress-Archive -Path "artifacts/win-x86/*" -DestinationPath "WinKeysRemapper-${{ steps.version.outputs.version }}-x86.zip" -Force  
         Compress-Archive -Path "artifacts/portable/*" -DestinationPath "WinKeysRemapper-${{ steps.version.outputs.version }}-portable.zip" -Force
@@ -44,7 +58,7 @@ jobs:
       run: |
         gh release create ${{ github.ref_name }} `
           --title "WinKeysRemapper ${{ github.ref_name }}" `
-          --notes "Release ${{ github.ref_name }}" `
+          --notes "Release ${{ github.ref_name }}%0A%0A## 🛡️ Windows Security Warning%0AWindows may show a security warning when running downloaded software. This is normal for unsigned applications. See the included documentation for instructions on how to safely run WinKeysRemapper.%0A%0A## 📥 Downloads%0A- **x64**: For modern 64-bit Windows (most common)%0A- **x86**: For older or 32-bit Windows%0A- **portable**: Requires .NET 8 (smallest download)" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x64.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x86.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-portable.zip"

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -14,9 +14,12 @@
     <!-- Assembly Metadata -->
     <AssemblyTitle>WinKeysRemapper</AssemblyTitle>
     <AssemblyDescription>High-performance Windows keyboard input remapper with application-specific targeting</AssemblyDescription>
-    <AssemblyCompany>WinKeysRemapper</AssemblyCompany>
+    <AssemblyCompany>eg3r</AssemblyCompany>
     <AssemblyProduct>WinKeysRemapper</AssemblyProduct>
-    <Copyright>Copyright © 2025 WinKeysRemapper</Copyright>
+    <Copyright>Copyright  2025 eg3r</Copyright>
+    
+    <!-- Additional metadata for better identification -->
+    <AssemblyInformationalVersion>$(Version)</AssemblyInformationalVersion>
     
     <!-- Publishing Options -->
     <PublishSingleFile>true</PublishSingleFile>
