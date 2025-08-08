@@ -16,6 +16,7 @@ A high-performance Windows keyboard input remapper that allows you to remap spec
 - 📝 **JSON Configuration** - Easy-to-edit configuration files
 - 🚀 **Low-Level Hooks** - Direct Windows API integration for reliable key interception
 - 🛡️ **Background Processing** - Optimized hook callbacks with background process detection
+- 🎮 **System Tray Interface** - Runs quietly in the background with easy access via system tray
 
 ## 🚀 Quick Start
 
@@ -46,6 +47,25 @@ A high-performance Windows keyboard input remapper that allows you to remap spec
 ./build.bat
 ```
 
+## 🖥️ User Interface
+
+WinKeysRemapper features a clean system tray interface that keeps it running quietly in the background:
+
+### System Tray
+- **Background Operation** - The application runs silently in the system tray without cluttering your desktop
+- **Tray Icon** - Look for the WinKeysRemapper icon in your system tray (bottom-right corner of your screen)
+- **Context Menu** - Right-click the tray icon to access application controls:
+  - **Reload Configuration** - Instantly reload your `key_mappings.json` file without restarting the app
+  - **Exit** - Cleanly shutdown the application and remove the keyboard hook
+
+### Admin Privileges
+⚠️ **Important:** WinKeysRemapper requires administrator privileges to install low-level keyboard hooks. When you first run the application, Windows will prompt you to allow elevated permissions.
+
+### Configuration Management
+- Edit your `key_mappings.json` file with any text editor
+- Use the "Reload Configuration" option from the tray menu to apply changes instantly
+- No need to restart the application when updating key mappings
+
 ## 📁 Project Structure
 
 ```
@@ -56,6 +76,8 @@ WinKeysRemapper/
 │   ├── Input/                    # Input handling and keyboard hooks
 │   │   ├── LowLevelKeyboardHook.cs
 │   │   └── VirtualKeyParser.cs
+│   ├── UI/                       # User interface components
+│   │   └── TrayManager.cs        # System tray management
 │   ├── Program.cs               # Application entry point
 │   └── WinKeysRemapper.csproj   # Project file
 ├── config/                      # Configuration files
@@ -83,6 +105,11 @@ The application uses JSON configuration files. On first run, it creates a defaul
   }
 }
 ```
+
+**Configuration Notes:**
+- The configuration file is created automatically in the same directory as the executable
+- Use the system tray "Reload Configuration" option to apply changes without restarting
+- The `TargetApplication` field supports partial process name matching (e.g., "hoi4" matches "Hearts of Iron IV")
 
 ### Supported Keys
 

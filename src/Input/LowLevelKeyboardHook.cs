@@ -16,6 +16,12 @@ namespace WinKeysRemapper.Input
         private const int WM_SYSKEYUP = 0x0105;
         private const int HC_ACTION = 0;
         
+        // Arrow key scan codes
+        private const uint LEFT_ARROW_SCAN = 0x4B;
+        private const uint UP_ARROW_SCAN = 0x48;  
+        private const uint RIGHT_ARROW_SCAN = 0x4D;
+        private const uint DOWN_ARROW_SCAN = 0x50;
+        
         // Flag to prevent infinite loops - same as PowerToys uses
         private const uint KEYBOARDMANAGER_INJECTED_FLAG = 0xFFFFFFF0;
 
@@ -28,6 +34,10 @@ namespace WinKeysRemapper.Input
         // Configuration
         private readonly Dictionary<int, int> _keyMappings;
         private readonly HashSet<string> _targetApplications;
+        
+        // Key state tracking to handle proper down/up events
+        private readonly HashSet<int> _pressedKeys = new HashSet<int>();
+        private readonly object _keyStateLock = new object();
         
         // Process checking optimization - background thread updates
         private volatile bool _isTargetApplication = false;
@@ -113,6 +123,15 @@ namespace WinKeysRemapper.Input
 
         [DllImport("kernel32.dll")]
         private static extern uint GetCurrentThreadId();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern uint MapVirtualKey(uint uCode, uint uMapType);
 
         public LowLevelKeyboardHook(Dictionary<int, int> keyMappings, HashSet<string> targetApplications)
         {
@@ -216,8 +235,12 @@ namespace WinKeysRemapper.Input
                 return CallNextHookEx(_instance._hookID, nCode, wParam, lParam);
             }
 
-            // Only process key down events for remapping
-            if ((int)wParam != WM_KEYDOWN && (int)wParam != WM_SYSKEYDOWN)
+            // Process both key down and key up events
+            var wParamInt = (int)wParam;
+            bool isKeyDown = (wParamInt == WM_KEYDOWN || wParamInt == WM_SYSKEYDOWN);
+            bool isKeyUp = (wParamInt == WM_KEYUP || wParamInt == WM_SYSKEYUP);
+            
+            if (!isKeyDown && !isKeyUp)
             {
                 return CallNextHookEx(_instance._hookID, nCode, wParam, lParam);
             }
@@ -226,8 +249,45 @@ namespace WinKeysRemapper.Input
             var vkCode = (int)hookStruct.vkCode;
             if (_instance._keyMappings.TryGetValue(vkCode, out int mappedKey))
             {
-                // Send the mapped key
-                _instance.SendKey(mappedKey);
+                lock (_instance._keyStateLock)
+                {
+                    if (isKeyDown)
+                    {
+                        // Only send key down if we haven't already sent it (prevent key repeat issues)
+                        if (!_instance._pressedKeys.Contains(vkCode))
+                        {
+                            _instance._pressedKeys.Add(vkCode);
+                            
+                            // Check if the mapped key is an arrow key (requires special handling)
+                            if (mappedKey >= 0x25 && mappedKey <= 0x28) // Arrow keys
+                            {
+                                _instance.SendArrowKeyDown(mappedKey);
+                            }
+                            else
+                            {
+                                _instance.SendRegularKeyDown(mappedKey);
+                            }
+                        }
+                    }
+                    else if (isKeyUp)
+                    {
+                        // Only send key up if we had sent key down
+                        if (_instance._pressedKeys.Contains(vkCode))
+                        {
+                            _instance._pressedKeys.Remove(vkCode);
+                            
+                            // Check if the mapped key is an arrow key (requires special handling)
+                            if (mappedKey >= 0x25 && mappedKey <= 0x28) // Arrow keys
+                            {
+                                _instance.SendArrowKeyUp(mappedKey);
+                            }
+                            else
+                            {
+                                _instance.SendRegularKeyUp(mappedKey);
+                            }
+                        }
+                    }
+                }
                 
                 // Suppress the original key
                 return new IntPtr(1);
@@ -236,11 +296,144 @@ namespace WinKeysRemapper.Input
             return CallNextHookEx(_instance._hookID, nCode, wParam, lParam);
         }
 
-        private void SendKey(int vkCode)
+        private void SendArrowKeyDown(int vkCode)
+        {
+            uint scanCode = vkCode switch
+            {
+                0x25 => LEFT_ARROW_SCAN,  // Left Arrow
+                0x26 => UP_ARROW_SCAN,    // Up Arrow
+                0x27 => RIGHT_ARROW_SCAN, // Right Arrow  
+                0x28 => DOWN_ARROW_SCAN,  // Down Arrow
+                _ => 0
+            };
+
+            if (scanCode == 0) return;
+
+            try
+            {
+                // Find Hearts of Iron IV window
+                IntPtr hoi4Window = FindWindow(null!, "Hearts of Iron IV");
+                if (hoi4Window == IntPtr.Zero)
+                {
+                    hoi4Window = GetForegroundWindow();
+                }
+
+                if (hoi4Window != IntPtr.Zero)
+                {
+                    // Create proper lParam for arrow key down
+                    uint lParamDown = 1 | (scanCode << 16) | (1u << 24); // Extended key flag
+                    SendMessage(hoi4Window, WM_KEYDOWN, new IntPtr(vkCode), new IntPtr((int)lParamDown));
+                }
+            }
+            catch
+            {
+                // Fallback to SendInput
+                SendRegularKeyDown(vkCode);
+            }
+        }
+
+        private void SendArrowKeyUp(int vkCode)
+        {
+            uint scanCode = vkCode switch
+            {
+                0x25 => LEFT_ARROW_SCAN,  // Left Arrow
+                0x26 => UP_ARROW_SCAN,    // Up Arrow
+                0x27 => RIGHT_ARROW_SCAN, // Right Arrow  
+                0x28 => DOWN_ARROW_SCAN,  // Down Arrow
+                _ => 0
+            };
+
+            if (scanCode == 0) return;
+
+            try
+            {
+                // Find Hearts of Iron IV window
+                IntPtr hoi4Window = FindWindow(null!, "Hearts of Iron IV");
+                if (hoi4Window == IntPtr.Zero)
+                {
+                    hoi4Window = GetForegroundWindow();
+                }
+
+                if (hoi4Window != IntPtr.Zero)
+                {
+                    // Create proper lParam for arrow key up
+                    uint lParamUp = 1 | (scanCode << 16) | (1u << 24) | (1u << 30) | (1u << 31);
+                    SendMessage(hoi4Window, WM_KEYUP, new IntPtr(vkCode), new IntPtr((int)lParamUp));
+                }
+            }
+            catch
+            {
+                // Fallback to SendInput
+                SendRegularKeyUp(vkCode);
+            }
+        }
+
+        private void SendRegularKeyDown(int vkCode)
+        {
+            try
+            {
+                uint scanCode = MapVirtualKey((uint)vkCode, 0);
+
+                var input = new INPUT
+                {
+                    type = 1, // INPUT_KEYBOARD
+                    u = new InputUnion
+                    {
+                        ki = new KEYBDINPUT
+                        {
+                            wVk = (ushort)vkCode,
+                            wScan = (ushort)scanCode,
+                            dwFlags = 0, // Key down
+                            time = 0,
+                            dwExtraInfo = (UIntPtr)KEYBOARDMANAGER_INJECTED_FLAG
+                        }
+                    }
+                };
+
+                SendInput(1, new INPUT[] { input }, Marshal.SizeOf(typeof(INPUT)));
+            }
+            catch
+            {
+                // Silently ignore errors
+            }
+        }
+
+        private void SendRegularKeyUp(int vkCode)
+        {
+            try
+            {
+                uint scanCode = MapVirtualKey((uint)vkCode, 0);
+
+                var input = new INPUT
+                {
+                    type = 1, // INPUT_KEYBOARD
+                    u = new InputUnion
+                    {
+                        ki = new KEYBDINPUT
+                        {
+                            wVk = (ushort)vkCode,
+                            wScan = (ushort)scanCode,
+                            dwFlags = 2, // KEYEVENTF_KEYUP
+                            time = 0,
+                            dwExtraInfo = (UIntPtr)KEYBOARDMANAGER_INJECTED_FLAG
+                        }
+                    }
+                };
+
+                SendInput(1, new INPUT[] { input }, Marshal.SizeOf(typeof(INPUT)));
+            }
+            catch
+            {
+                // Silently ignore errors
+            }
+        }
+
+        private void SendRegularKey(int vkCode)
         {
             try
             {
                 var inputs = new INPUT[2];
+                uint scanCode = MapVirtualKey((uint)vkCode, 0);
 
                 // Key down
                 inputs[0] = new INPUT
@@ -251,7 +444,7 @@ namespace WinKeysRemapper.Input
                         ki = new KEYBDINPUT
                         {
                             wVk = (ushort)vkCode,
-                            wScan = 0,
+                            wScan = (ushort)scanCode,
                             dwFlags = 0,
                             time = 0,
                             dwExtraInfo = (UIntPtr)KEYBOARDMANAGER_INJECTED_FLAG
@@ -268,7 +461,7 @@ namespace WinKeysRemapper.Input
                         ki = new KEYBDINPUT
                         {
                             wVk = (ushort)vkCode,
-                            wScan = 0,
+                            wScan = (ushort)scanCode,
                             dwFlags = 2, // KEYEVENTF_KEYUP
                             time = 0,
                             dwExtraInfo = (UIntPtr)KEYBOARDMANAGER_INJECTED_FLAG
