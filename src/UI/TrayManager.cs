@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using Microsoft.Win32;
+using System.Reflection;
 using WinKeysRemapper.Configuration;
 using WinKeysRemapper.Input;
 
@@ -36,12 +38,19 @@ namespace WinKeysRemapper.UI
             openConfigMenuItem.Click += OnOpenConfig;
             openConfigMenuItem.Image = CreateMenuIcon("📝"); // Edit/document icon
             
+            var startupMenuItem = new ToolStripMenuItem("Start with Windows");
+            startupMenuItem.Click += OnToggleStartup;
+            startupMenuItem.CheckOnClick = true;
+            startupMenuItem.Checked = IsStartupEnabled();
+            startupMenuItem.Image = CreateMenuIcon("🚀"); // Startup icon
+            
             var exitMenuItem = new ToolStripMenuItem("Exit");
             exitMenuItem.Click += OnExit;
             exitMenuItem.Image = CreateMenuIcon("❌"); // Exit icon
             
             _contextMenu.Items.Add(reloadMenuItem);
             _contextMenu.Items.Add(openConfigMenuItem);
+            _contextMenu.Items.Add(startupMenuItem);
             _contextMenu.Items.Add(new ToolStripSeparator());
             _contextMenu.Items.Add(exitMenuItem);
 
@@ -142,6 +151,21 @@ namespace WinKeysRemapper.UI
                             graphics.DrawLine(new Pen(Color.Red, 2), 4, 4, 12, 12);
                             graphics.DrawLine(new Pen(Color.Red, 2), 12, 4, 4, 12);
                             break;
+                        case "🚀": // Startup
+                            // Draw a simple rocket shape
+                            var points = new Point[] {
+                                new Point(8, 2),   // Top
+                                new Point(10, 6),  // Right wing
+                                new Point(9, 10),  // Right bottom
+                                new Point(8, 12),  // Bottom point
+                                new Point(7, 10),  // Left bottom
+                                new Point(6, 6)    // Left wing
+                            };
+                            graphics.FillPolygon(Brushes.Orange, points);
+                            graphics.DrawPolygon(new Pen(Color.DarkOrange, 1), points);
+                            // Add flame
+                            graphics.FillEllipse(Brushes.Red, 7, 12, 2, 3);
+                            break;
                     }
                 }
             }
@@ -234,6 +258,81 @@ namespace WinKeysRemapper.UI
                 ShowBalloonTip("Open Failed", 
                     $"Failed to open config file: {ex.Message}", 
                     ToolTipIcon.Error);
+            }
+        }
+
+        private void OnToggleStartup(object? sender, EventArgs e)
+        {
+            try
+            {
+                var menuItem = sender as ToolStripMenuItem;
+                if (menuItem != null)
+                {
+                    if (menuItem.Checked)
+                    {
+                        EnableStartup();
+                        ShowBalloonTip("Startup Enabled", 
+                            "WinKeysRemapper will now start with Windows.", 
+                            ToolTipIcon.Info);
+                    }
+                    else
+                    {
+                        DisableStartup();
+                        ShowBalloonTip("Startup Disabled", 
+                            "WinKeysRemapper will no longer start with Windows.", 
+                            ToolTipIcon.Info);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowBalloonTip("Startup Error", 
+                    $"Failed to modify startup settings: {ex.Message}", 
+                    ToolTipIcon.Error);
+            }
+        }
+
+        private bool IsStartupEnabled()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", false);
+                return key?.GetValue("WinKeysRemapper") != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void EnableStartup()
+        {
+            try
+            {
+                // For single-file apps, use Process.GetCurrentProcess().MainModule.FileName
+                // This works better than Assembly.Location for deployed apps
+                var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName 
+                             ?? System.AppContext.BaseDirectory + "WinKeysRemapper.exe";
+
+                using var key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+                key?.SetValue("WinKeysRemapper", $"\"{exePath}\"");
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to enable startup: {ex.Message}", ex);
+            }
+        }
+
+        private void DisableStartup()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+                key?.DeleteValue("WinKeysRemapper", false);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to disable startup: {ex.Message}", ex);
             }
         }
 

@@ -17,6 +17,7 @@ A high-performance Windows keyboard input remapper that allows you to remap spec
 - 🚀 **Low-Level Hooks** - Direct Windows API integration for reliable key interception
 - 🛡️ **Background Processing** - Optimized hook callbacks with background process detection
 - 🎮 **System Tray Interface** - Runs quietly in the background with easy access via system tray
+- 🏁 **Auto-Startup** - Optional automatic startup with Windows via registry integration
 
 ## 🚀 Quick Start
 
@@ -57,6 +58,7 @@ WinKeysRemapper features a clean system tray interface that keeps it running qui
 - **Context Menu** - Right-click the tray icon to access application controls:
   - **Reload Configuration** - Instantly reload your `key_mappings.json` file without restarting the app
   - **Open Config** - Open the configuration file with your default JSON editor (e.g., VS Code, Notepad++)
+  - **Start with Windows** - Toggle automatic startup when Windows boots (adds/removes registry entry)
   - **Exit** - Cleanly shutdown the application and remove the keyboard hook
 
 ### Admin Privileges
