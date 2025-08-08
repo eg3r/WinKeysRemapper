@@ -24,7 +24,7 @@ jobs:
       run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x86 --self-contained -o artifacts/win-x86
       
     - name: Build Portable
-      run: dotnet publish src/WinKeysRemapper.csproj -c Release --no-self-contained -o artifacts/portable
+      run: dotnet publish src/WinKeysRemapper.csproj -c Release --no-self-contained -o artifacts/portable -p:PublishTrimmed=false
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

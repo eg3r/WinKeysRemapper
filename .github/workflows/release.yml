@@ -27,7 +27,7 @@ jobs:
       run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x86 --self-contained -o artifacts/win-x86 -p:Version=${{ steps.version.outputs.version }}
       
     - name: Build Portable
-      run: dotnet publish src/WinKeysRemapper.csproj -c Release --no-self-contained -o artifacts/portable -p:Version=${{ steps.version.outputs.version }}
+      run: dotnet publish src/WinKeysRemapper.csproj -c Release --no-self-contained -o artifacts/portable -p:Version=${{ steps.version.outputs.version }} -p:PublishTrimmed=false
     
     - name: Create ZIP files
       run: |
