@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'  # Triggered when you push a version tag like v1.0.0
 
+permissions:
+  contents: write  # Required to create releases and upload assets
+
 jobs:
   release:
     runs-on: windows-latest
