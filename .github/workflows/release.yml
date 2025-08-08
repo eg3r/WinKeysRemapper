@@ -16,9 +16,11 @@ jobs:
     - name: Extract version from tag
       id: version
       run: |
-        $version = "${{ github.ref_name }}"
+        $tag = "${{ github.ref_name }}"
+        # Remove 'v' prefix if present (e.g., v1.0.1 -> 1.0.1)
+        $version = $tag -replace '^v', ''
         echo "version=$version" >> $env:GITHUB_OUTPUT
-        echo "Version: $version"
+        echo "Tag: $tag, Version: $version"
     
     - name: Build x64
       run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x64 --self-contained -o artifacts/win-x64 -p:Version=${{ steps.version.outputs.version }}
@@ -38,8 +40,8 @@ jobs:
     - name: Create Release
       run: |
         gh release create ${{ github.ref_name }} `
-          --title "WinKeysRemapper ${{ steps.version.outputs.version }}" `
-          --notes "Release ${{ steps.version.outputs.version }}" `
+          --title "WinKeysRemapper ${{ github.ref_name }}" `
+          --notes "Release ${{ github.ref_name }}" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x64.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x86.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-portable.zip"
