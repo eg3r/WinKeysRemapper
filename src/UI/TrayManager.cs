@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using Microsoft.Win32;
@@ -15,38 +17,41 @@ namespace WinKeysRemapper.UI
         private NotifyIcon? _notifyIcon;
         private ContextMenuStrip? _contextMenu;
         private ConfigurationManager _configManager;
+        private StartupManager _startupManager;
         private LowLevelKeyboardHook? _keyboardHook;
         private KeyMappingConfig? _config;
+        private readonly bool _isStartupMode;
 
-        public TrayManager()
+        public TrayManager(bool isStartupMode = false)
         {
+            _isStartupMode = isStartupMode;
             _configManager = new ConfigurationManager();
+            _startupManager = new StartupManager();
             InitializeTrayIcon();
             LoadConfigAndStartHook();
         }
 
         private void InitializeTrayIcon()
         {
-            // Create context menu
             _contextMenu = new ContextMenuStrip();
             
             var reloadMenuItem = new ToolStripMenuItem("Reload Config");
             reloadMenuItem.Click += OnReloadConfig;
-            reloadMenuItem.Image = CreateMenuIcon("🔄"); // Refresh icon
+            reloadMenuItem.Image = CreateMenuIcon("🔄");
             
             var openConfigMenuItem = new ToolStripMenuItem("Open Config");
             openConfigMenuItem.Click += OnOpenConfig;
-            openConfigMenuItem.Image = CreateMenuIcon("📝"); // Edit/document icon
+            openConfigMenuItem.Image = CreateMenuIcon("📝");
             
             var startupMenuItem = new ToolStripMenuItem("Start with Windows");
             startupMenuItem.Click += OnToggleStartup;
             startupMenuItem.CheckOnClick = true;
-            startupMenuItem.Checked = IsStartupEnabled();
-            startupMenuItem.Image = CreateMenuIcon("🚀"); // Startup icon
+            startupMenuItem.Checked = _startupManager.IsStartupEnabled();
+            startupMenuItem.Image = CreateMenuIcon("🚀");
             
             var exitMenuItem = new ToolStripMenuItem("Exit");
             exitMenuItem.Click += OnExit;
-            exitMenuItem.Image = CreateMenuIcon("❌"); // Exit icon
+            exitMenuItem.Image = CreateMenuIcon("❌");
             
             _contextMenu.Items.Add(reloadMenuItem);
             _contextMenu.Items.Add(openConfigMenuItem);
@@ -54,7 +59,6 @@ namespace WinKeysRemapper.UI
             _contextMenu.Items.Add(new ToolStripSeparator());
             _contextMenu.Items.Add(exitMenuItem);
 
-            // Create notify icon
             _notifyIcon = new NotifyIcon
             {
                 Icon = CreateIcon(),
@@ -63,40 +67,34 @@ namespace WinKeysRemapper.UI
                 Visible = true
             };
 
-            // Double-click to show status
             _notifyIcon.DoubleClick += OnDoubleClick;
         }
 
         private Icon CreateIcon()
         {
-            // Create a modern-looking keyboard icon
             var bitmap = new Bitmap(32, 32);
             using (var graphics = Graphics.FromImage(bitmap))
             {
                 graphics.Clear(Color.Transparent);
                 graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 
-                // Create a modern keyboard icon with gradient
                 var rect = new Rectangle(4, 8, 24, 16);
                 var keyboardBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
                     rect, Color.FromArgb(70, 130, 180), Color.FromArgb(25, 25, 112), 45f);
                 
-                // Main keyboard body
                 graphics.FillRoundedRectangle(keyboardBrush, rect, 3);
                 graphics.DrawRoundedRectangle(new Pen(Color.FromArgb(50, 50, 50), 1), rect, 3);
                 
-                // Draw some key indicators
                 var keyBrush = new SolidBrush(Color.FromArgb(220, 220, 220));
-                graphics.FillRectangle(keyBrush, 7, 11, 3, 2);  // Key 1
-                graphics.FillRectangle(keyBrush, 11, 11, 3, 2); // Key 2
-                graphics.FillRectangle(keyBrush, 15, 11, 3, 2); // Key 3
-                graphics.FillRectangle(keyBrush, 19, 11, 3, 2); // Key 4
+                graphics.FillRectangle(keyBrush, 7, 11, 3, 2);
+                graphics.FillRectangle(keyBrush, 11, 11, 3, 2);
+                graphics.FillRectangle(keyBrush, 15, 11, 3, 2);
+                graphics.FillRectangle(keyBrush, 19, 11, 3, 2);
                 
-                graphics.FillRectangle(keyBrush, 7, 14, 4, 2);  // Space key simulation
-                graphics.FillRectangle(keyBrush, 12, 14, 4, 2); // Space key simulation
-                graphics.FillRectangle(keyBrush, 17, 14, 4, 2); // Space key simulation
+                graphics.FillRectangle(keyBrush, 7, 14, 4, 2);
+                graphics.FillRectangle(keyBrush, 12, 14, 4, 2);
+                graphics.FillRectangle(keyBrush, 17, 14, 4, 2);
                 
-                // Add a small "remap" indicator arrow
                 var arrowPen = new Pen(Color.FromArgb(255, 215, 0), 2);
                 graphics.DrawLine(arrowPen, 24, 4, 28, 4);
                 graphics.DrawLine(arrowPen, 26, 2, 28, 4);
@@ -119,7 +117,6 @@ namespace WinKeysRemapper.UI
                 graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
                 
-                // Try to use emoji first, fallback to simple graphics if needed
                 try
                 {
                     using (var font = new Font("Segoe UI Emoji", 10, FontStyle.Regular))
@@ -132,38 +129,31 @@ namespace WinKeysRemapper.UI
                 }
                 catch
                 {
-                    // Fallback to simple geometric shapes
                     switch (emoji)
                     {
-                        case "🔄": // Reload
+                        case "🔄":
                             graphics.DrawEllipse(new Pen(Color.Blue, 2), 2, 2, 12, 12);
                             graphics.DrawLine(new Pen(Color.Blue, 2), 8, 2, 10, 4);
                             graphics.DrawLine(new Pen(Color.Blue, 2), 10, 4, 8, 6);
                             break;
-                        case "📝": // Edit
+                        case "📝":
                             graphics.FillRectangle(Brushes.White, 3, 2, 8, 11);
                             graphics.DrawRectangle(Pens.Black, 3, 2, 8, 11);
                             graphics.DrawLine(new Pen(Color.Blue, 1), 5, 5, 9, 5);
                             graphics.DrawLine(new Pen(Color.Blue, 1), 5, 7, 9, 7);
                             graphics.DrawLine(new Pen(Color.Blue, 1), 5, 9, 7, 9);
                             break;
-                        case "❌": // Exit
+                        case "❌":
                             graphics.DrawLine(new Pen(Color.Red, 2), 4, 4, 12, 12);
                             graphics.DrawLine(new Pen(Color.Red, 2), 12, 4, 4, 12);
                             break;
-                        case "🚀": // Startup
-                            // Draw a simple rocket shape
+                        case "🚀":
                             var points = new Point[] {
-                                new Point(8, 2),   // Top
-                                new Point(10, 6),  // Right wing
-                                new Point(9, 10),  // Right bottom
-                                new Point(8, 12),  // Bottom point
-                                new Point(7, 10),  // Left bottom
-                                new Point(6, 6)    // Left wing
+                                new Point(8, 2), new Point(10, 6), new Point(9, 10),
+                                new Point(8, 12), new Point(7, 10), new Point(6, 6)
                             };
                             graphics.FillPolygon(Brushes.Orange, points);
                             graphics.DrawPolygon(new Pen(Color.DarkOrange, 1), points);
-                            // Add flame
                             graphics.FillEllipse(Brushes.Red, 7, 12, 2, 3);
                             break;
                     }
@@ -178,14 +168,11 @@ namespace WinKeysRemapper.UI
             {
                 _config = _configManager.LoadConfig();
                 
-                // Stop existing hook if any
                 _keyboardHook?.Dispose();
                 
-                // Convert configuration to the format expected by the hook
                 var keyMappings = new Dictionary<int, int>();
                 var targetApplications = new HashSet<string> { _config.TargetApplication };
                 
-                // Convert string key names to virtual key codes
                 var successfulMappings = 0;
                 foreach (var mapping in _config.KeyMappings)
                 {
@@ -197,20 +184,31 @@ namespace WinKeysRemapper.UI
                     }
                 }
                 
-                // Create and start new hook
                 _keyboardHook = LowLevelKeyboardHook.CreateInstance(keyMappings, targetApplications);
                 _keyboardHook.InstallHook();
                 
-                ShowBalloonTip("WinKeysRemapper Started", 
-                    $"Monitoring: {_config.TargetApplication}\n" +
-                    $"Mappings: {successfulMappings}/{_config.KeyMappings.Count} keys parsed successfully", 
-                    ToolTipIcon.Info);
+                if (!_isStartupMode)
+                {
+                    ShowBalloonTip("WinKeysRemapper Started", 
+                        $"Monitoring: {_config.TargetApplication}\n" +
+                        $"Mappings: {successfulMappings}/{_config.KeyMappings.Count} keys parsed successfully", 
+                        ToolTipIcon.Info);
+                }
             }
             catch (Exception ex)
             {
-                ShowBalloonTip("Configuration Error", 
-                    $"Failed to load config: {ex.Message}", 
-                    ToolTipIcon.Error);
+                if (_isStartupMode)
+                {
+                    ShowBalloonTip("WinKeysRemapper Error", 
+                        "Failed to load configuration", 
+                        ToolTipIcon.Error);
+                }
+                else
+                {
+                    ShowBalloonTip("Configuration Error", 
+                        $"Failed to load config: {ex.Message}", 
+                        ToolTipIcon.Error);
+                }
             }
         }
 
@@ -219,9 +217,6 @@ namespace WinKeysRemapper.UI
             try
             {
                 LoadConfigAndStartHook();
-                // ShowBalloonTip("Config Reloaded", 
-                //     "Configuration has been successfully reloaded.", 
-                //     ToolTipIcon.Info);
             }
             catch (Exception ex)
             {
@@ -237,10 +232,9 @@ namespace WinKeysRemapper.UI
             {
                 var configPath = _configManager.GetConfigPath();
                 
-                if (System.IO.File.Exists(configPath))
+                if (File.Exists(configPath))
                 {
-                    // Use Windows shell to open the file with the default application
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    Process.Start(new ProcessStartInfo
                     {
                         FileName = configPath,
                         UseShellExecute = true
@@ -263,76 +257,26 @@ namespace WinKeysRemapper.UI
 
         private void OnToggleStartup(object? sender, EventArgs e)
         {
+            var menuItem = sender as ToolStripMenuItem;
+            if (menuItem == null) return;
+
             try
             {
-                var menuItem = sender as ToolStripMenuItem;
-                if (menuItem != null)
+                if (menuItem.Checked)
                 {
-                    if (menuItem.Checked)
-                    {
-                        EnableStartup();
-                        ShowBalloonTip("Startup Enabled", 
-                            "WinKeysRemapper will now start with Windows.", 
-                            ToolTipIcon.Info);
-                    }
-                    else
-                    {
-                        DisableStartup();
-                        ShowBalloonTip("Startup Disabled", 
-                            "WinKeysRemapper will no longer start with Windows.", 
-                            ToolTipIcon.Info);
-                    }
+                    _startupManager.EnableStartup();
+                }
+                else
+                {
+                    _startupManager.DisableStartup();
                 }
             }
             catch (Exception ex)
             {
-                ShowBalloonTip("Startup Error", 
-                    $"Failed to modify startup settings: {ex.Message}", 
-                    ToolTipIcon.Error);
-            }
-        }
-
-        private bool IsStartupEnabled()
-        {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", false);
-                return key?.GetValue("WinKeysRemapper") != null;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private void EnableStartup()
-        {
-            try
-            {
-                // For single-file apps, use Process.GetCurrentProcess().MainModule.FileName
-                // This works better than Assembly.Location for deployed apps
-                var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName 
-                             ?? System.AppContext.BaseDirectory + "WinKeysRemapper.exe";
-
-                using var key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-                key?.SetValue("WinKeysRemapper", $"\"{exePath}\"");
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Failed to enable startup: {ex.Message}", ex);
-            }
-        }
-
-        private void DisableStartup()
-        {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-                key?.DeleteValue("WinKeysRemapper", false);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Failed to disable startup: {ex.Message}", ex);
+                MessageBox.Show($"Failed to toggle startup: {ex.Message}", "Error", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                
+                menuItem.Checked = !menuItem.Checked;
             }
         }
 
@@ -363,7 +307,6 @@ namespace WinKeysRemapper.UI
         }
     }
 
-    // Extension methods for modern graphics
     public static class GraphicsExtensions
     {
         public static void FillRoundedRectangle(this Graphics graphics, Brush brush, Rectangle rectangle, int radius)

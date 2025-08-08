@@ -10,6 +10,9 @@ namespace WinKeysRemapper
         [STAThread]
         static void Main(string[] args)
         {
+            // Check if started from Windows startup (silent mode)
+            bool isStartupMode = args.Length > 0 && (args[0] == "--startup" || args[0] == "/startup");
+            
             // Enable visual styles for Windows Forms
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -19,23 +22,29 @@ namespace WinKeysRemapper
             
             if (!isNewInstance)
             {
-                MessageBox.Show("WinKeysRemapper is already running in the system tray.", 
-                    "Already Running", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (!isStartupMode) // Only show message if not started from startup
+                {
+                    MessageBox.Show("WinKeysRemapper is already running in the system tray.", 
+                        "Already Running", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
                 return;
             }
 
             try
             {
-                // Create and run the tray application
-                using var trayManager = new TrayManager();
+                // Create and run the tray application with startup mode flag
+                using var trayManager = new TrayManager(isStartupMode);
                 
                 // Run the Windows Forms message loop
                 Application.Run();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error starting WinKeysRemapper: {ex.Message}", 
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if (!isStartupMode) // Only show error dialog if not started from startup
+                {
+                    MessageBox.Show($"Error starting WinKeysRemapper: {ex.Message}", 
+                        "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
     }
