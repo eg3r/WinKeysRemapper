@@ -56,9 +56,21 @@ jobs:
     
     - name: Create Release
       run: |
+        $releaseNotes = @"
+        Release ${{ github.ref_name }}
+
+        ## 🛡️ Windows Security Warning
+        Windows may show a security warning when running downloaded software. This is normal for unsigned applications. See the included documentation for instructions on how to safely run WinKeysRemapper.
+
+        ## 📥 Downloads
+        - **x64**: For modern 64-bit Windows (most common)
+        - **x86**: For older or 32-bit Windows  
+        - **portable**: Requires .NET 8 (smallest download)
+        "@
+        
         gh release create ${{ github.ref_name }} `
           --title "WinKeysRemapper ${{ github.ref_name }}" `
-          --notes "Release ${{ github.ref_name }}%0A%0A## 🛡️ Windows Security Warning%0AWindows may show a security warning when running downloaded software. This is normal for unsigned applications. See the included documentation for instructions on how to safely run WinKeysRemapper.%0A%0A## 📥 Downloads%0A- **x64**: For modern 64-bit Windows (most common)%0A- **x86**: For older or 32-bit Windows%0A- **portable**: Requires .NET 8 (smallest download)" `
+          --notes $releaseNotes `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x64.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x86.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-portable.zip"
