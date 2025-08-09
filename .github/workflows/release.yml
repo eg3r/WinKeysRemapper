@@ -25,13 +25,13 @@ jobs:
         echo "Tag: $tag, Version: $version"
     
     - name: Build x64
-      run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x64 --self-contained -o artifacts/win-x64 -p:Version=${{ steps.version.outputs.version }}
+      run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x64 --self-contained -o artifacts/win-x64 -p:Version=${{ steps.version.outputs.version }} -p:AssemblyVersion=${{ steps.version.outputs.version }} -p:FileVersion=${{ steps.version.outputs.version }} -p:AssemblyInformationalVersion=${{ steps.version.outputs.version }} -p:IncludeSourceRevisionInInformationalVersion=false
       
     - name: Build x86  
-      run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x86 --self-contained -o artifacts/win-x86 -p:Version=${{ steps.version.outputs.version }}
+      run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x86 --self-contained -o artifacts/win-x86 -p:Version=${{ steps.version.outputs.version }} -p:AssemblyVersion=${{ steps.version.outputs.version }} -p:FileVersion=${{ steps.version.outputs.version }} -p:AssemblyInformationalVersion=${{ steps.version.outputs.version }} -p:IncludeSourceRevisionInInformationalVersion=false
       
     - name: Build Portable
-      run: dotnet publish src/WinKeysRemapper.csproj -c Release --no-self-contained -o artifacts/portable -p:Version=${{ steps.version.outputs.version }} -p:PublishTrimmed=false
+      run: dotnet publish src/WinKeysRemapper.csproj -c Release --no-self-contained -o artifacts/portable -p:Version=${{ steps.version.outputs.version }} -p:AssemblyVersion=${{ steps.version.outputs.version }} -p:FileVersion=${{ steps.version.outputs.version }} -p:AssemblyInformationalVersion=${{ steps.version.outputs.version }} -p:IncludeSourceRevisionInInformationalVersion=false -p:PublishTrimmed=false
     
     - name: Create ZIP files
       run: |
@@ -47,18 +47,45 @@ jobs:
       id: tag_message
       run: |
         $tagMessage = git tag -l --format='%(contents)' "${{ github.ref_name }}"
-        $tagMessage = $tagMessage -join " "
-        $tagMessage = $tagMessage -replace '"', '`"' -replace "'", "``'"
+        if ($tagMessage.Trim() -eq "") {
+          $tagMessage = "See commit history for detailed changes in this release."
+        }
         echo "message=$tagMessage" >> $env:GITHUB_OUTPUT
         echo "Tag message: $tagMessage"
-    
+
     - name: Create Release
       run: |
+        $version = "${{ github.ref_name }}"
         $tagMessage = "${{ steps.tag_message.outputs.message }}"
         
+        # Create clean release notes with tag message
+        echo "Release $version" > release-notes.md
+        echo "" >> release-notes.md
+        echo "## 🎯 What's New" >> release-notes.md
+        echo "$tagMessage" >> release-notes.md
+        echo "" >> release-notes.md
+        echo "## 🛡️ Windows Security Warning" >> release-notes.md
+        echo "Windows may show a security warning when running downloaded software. This is normal for unsigned applications." >> release-notes.md
+        echo "" >> release-notes.md
+        echo "## 📥 Downloads" >> release-notes.md
+        echo "- **x64**: For modern 64-bit Windows (most common)" >> release-notes.md
+        echo "- **x86**: For older or 32-bit Windows" >> release-notes.md
+        echo "- **portable**: Requires .NET 8 (smallest download)" >> release-notes.md
+        echo "" >> release-notes.md
+        echo "## 📖 Documentation" >> release-notes.md
+        echo "Each download includes:" >> release-notes.md
+        echo "- Complete usage guide" >> release-notes.md
+        echo "- Setup instructions" >> release-notes.md
+        echo "- Security guidance" >> release-notes.md
+        
+        # Show the content for debugging
+        Write-Host "Release notes content:"
+        Get-Content release-notes.md
+        
+        # Create release using the file
         gh release create ${{ github.ref_name }} `
           --title "WinKeysRemapper ${{ github.ref_name }}" `
-          --notes "Release ${{ github.ref_name }}`n`n$tagMessage`n`n## Downloads`n- **x64**: For modern 64-bit Windows (most common)`n- **x86**: For older or 32-bit Windows`n- **portable**: Requires .NET 8 (smallest download)" `
+          --notes-file "release-notes.md" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x64.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x86.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-portable.zip"
