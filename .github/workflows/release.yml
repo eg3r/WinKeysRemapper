@@ -3,10 +3,10 @@ name: Tagged Release
 on:
   push:
     tags:
-      - 'v*'  # Triggered when you push a version tag like v1.0.0
+      - 'v*'
 
 permissions:
-  contents: write  # Required to create releases and upload assets
+  contents: write
 
 jobs:
   release:
@@ -15,69 +15,14 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Extract version from tag
       id: version
       run: |
         $tag = "${{ github.ref_name }}"
-        # Remove 'v' prefix if present (e.g., v1.0.1 -> 1.0.1)
         $version = $tag -replace '^v', ''
         echo "version=$version" >> $env:GITHUB_OUTPUT
         echo "Tag: $tag, Version: $version"
-    
-    - name: Update project version
-      run: |
-        $version = "${{ steps.version.outputs.version }}"
-        $projectFile = "src/WinKeysRemapper.csproj"
-        
-        # Read the project file
-        $content = Get-Content $projectFile -Raw
-        
-        # Update version numbers
-        $content = $content -replace '<Version>[^<]*</Version>', "<Version>$version</Version>"
-        $content = $content -replace '<AssemblyVersion>[^<]*</AssemblyVersion>', "<AssemblyVersion>$version</AssemblyVersion>"
-        $content = $content -replace '<FileVersion>[^<]*</FileVersion>', "<FileVersion>$version</FileVersion>"
-        
-        # Write back to file
-        $content | Set-Content $projectFile -NoNewline
-        
-        echo "Updated project version to $version"
-    
-    - name: Commit version update
-      run: |
-        # Switch to main branch to commit changes
-        git checkout main
-        git pull origin main
-        
-        # Apply the version changes
-        $version = "${{ steps.version.outputs.version }}"
-        $projectFile = "src/WinKeysRemapper.csproj"
-        
-        $content = Get-Content $projectFile -Raw
-        $content = $content -replace '<Version>[^<]*</Version>', "<Version>$version</Version>"
-        $content = $content -replace '<AssemblyVersion>[^<]*</AssemblyVersion>', "<AssemblyVersion>$version</AssemblyVersion>"
-        $content = $content -replace '<FileVersion>[^<]*</FileVersion>', "<FileVersion>$version</FileVersion>"
-        $content | Set-Content $projectFile -NoNewline
-        
-        # Commit and push
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add src/WinKeysRemapper.csproj
-        
-        # Only commit if there are changes
-        if (git diff --staged --quiet) {
-          echo "No version changes to commit"
-        } else {
-          git commit -m "chore: update project version to $version [skip ci]"
-          git push origin main
-          echo "Version updated and committed to main"
-        }
-        
-        # Switch back to the tag for building
-        git checkout "${{ github.ref_name }}"
     
     - name: Build x64
       run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x64 --self-contained -o artifacts/win-x64 -p:Version=${{ steps.version.outputs.version }}
@@ -90,20 +35,10 @@ jobs:
     
     - name: Create ZIP files
       run: |
-        # Copy documentation to each build folder
         Copy-Item "README.md" -Destination "artifacts/win-x64/" -Force
-        Copy-Item "docs/installation.md" -Destination "artifacts/win-x64/" -Force
-        Copy-Item "docs/windows-security-warning.md" -Destination "artifacts/win-x64/" -Force
-        
         Copy-Item "README.md" -Destination "artifacts/win-x86/" -Force
-        Copy-Item "docs/installation.md" -Destination "artifacts/win-x86/" -Force
-        Copy-Item "docs/windows-security-warning.md" -Destination "artifacts/win-x86/" -Force
-        
         Copy-Item "README.md" -Destination "artifacts/portable/" -Force
-        Copy-Item "docs/installation.md" -Destination "artifacts/portable/" -Force
-        Copy-Item "docs/windows-security-warning.md" -Destination "artifacts/portable/" -Force
         
-        # Create ZIP files
         Compress-Archive -Path "artifacts/win-x64/*" -DestinationPath "WinKeysRemapper-${{ steps.version.outputs.version }}-x64.zip" -Force
         Compress-Archive -Path "artifacts/win-x86/*" -DestinationPath "WinKeysRemapper-${{ steps.version.outputs.version }}-x86.zip" -Force  
         Compress-Archive -Path "artifacts/portable/*" -DestinationPath "WinKeysRemapper-${{ steps.version.outputs.version }}-portable.zip" -Force
@@ -112,13 +47,9 @@ jobs:
       id: tag_message
       run: |
         $tagMessage = git tag -l --format='%(contents)' "${{ github.ref_name }}"
-        # Remove empty lines and format
         $tagMessage = $tagMessage | Where-Object { $_.Trim() -ne "" }
         $formattedMessage = $tagMessage -join "`n"
-        
-        # Escape special characters for GitHub output
         $escapedMessage = $formattedMessage -replace '"', '\"' -replace '`', '\`'
-        
         echo "message=$escapedMessage" >> $env:GITHUB_OUTPUT
         echo "Tag message: $escapedMessage"
     
@@ -126,26 +57,16 @@ jobs:
       run: |
         $tagMessage = "${{ steps.tag_message.outputs.message }}"
         
-        # Build release notes with tag message
         $releaseNotes = @"
         Release ${{ github.ref_name }}
 
-        ## � What's New
+        ## What's New
         $tagMessage
 
-        ## �🛡️ Windows Security Warning
-        Windows may show a security warning when running downloaded software. This is normal for unsigned applications. See the included documentation for instructions on how to safely run WinKeysRemapper.
-
-        ## 📥 Downloads
+        ## Downloads
         - **x64**: For modern 64-bit Windows (most common)
         - **x86**: For older or 32-bit Windows  
         - **portable**: Requires .NET 8 (smallest download)
-
-        ## 📖 Documentation
-        Each download includes:
-        - `README.md` - Complete usage guide
-        - `installation.md` - Setup instructions
-        - `windows-security-warning.md` - Security guidance
         "@
         
         gh release create ${{ github.ref_name }} `
