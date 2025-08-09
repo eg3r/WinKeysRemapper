@@ -15,6 +15,9 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Extract version from tag
       id: version
@@ -45,11 +48,36 @@ jobs:
     
     - name: Commit version update
       run: |
+        # Switch to main branch to commit changes
+        git checkout main
+        git pull origin main
+        
+        # Apply the version changes
+        $version = "${{ steps.version.outputs.version }}"
+        $projectFile = "src/WinKeysRemapper.csproj"
+        
+        $content = Get-Content $projectFile -Raw
+        $content = $content -replace '<Version>[^<]*</Version>', "<Version>$version</Version>"
+        $content = $content -replace '<AssemblyVersion>[^<]*</AssemblyVersion>', "<AssemblyVersion>$version</AssemblyVersion>"
+        $content = $content -replace '<FileVersion>[^<]*</FileVersion>', "<FileVersion>$version</FileVersion>"
+        $content | Set-Content $projectFile -NoNewline
+        
+        # Commit and push
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add src/WinKeysRemapper.csproj
-        git commit -m "chore: update project version to ${{ steps.version.outputs.version }}" || echo "No changes to commit"
-        git push || echo "Nothing to push"
+        
+        # Only commit if there are changes
+        if (git diff --staged --quiet) {
+          echo "No version changes to commit"
+        } else {
+          git commit -m "chore: update project version to $version [skip ci]"
+          git push origin main
+          echo "Version updated and committed to main"
+        }
+        
+        # Switch back to the tag for building
+        git checkout "${{ github.ref_name }}"
     
     - name: Build x64
       run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x64 --self-contained -o artifacts/win-x64 -p:Version=${{ steps.version.outputs.version }}
