@@ -47,31 +47,18 @@ jobs:
       id: tag_message
       run: |
         $tagMessage = git tag -l --format='%(contents)' "${{ github.ref_name }}"
-        $tagMessage = $tagMessage | Where-Object { $_.Trim() -ne "" }
-        $formattedMessage = $tagMessage -join "`n"
-        $escapedMessage = $formattedMessage -replace '"', '\"' -replace '`', '\`'
-        echo "message=$escapedMessage" >> $env:GITHUB_OUTPUT
-        echo "Tag message: $escapedMessage"
+        $tagMessage = $tagMessage -join " "
+        $tagMessage = $tagMessage -replace '"', '`"' -replace "'", "``'"
+        echo "message=$tagMessage" >> $env:GITHUB_OUTPUT
+        echo "Tag message: $tagMessage"
     
     - name: Create Release
       run: |
         $tagMessage = "${{ steps.tag_message.outputs.message }}"
         
-        $releaseNotes = @"
-        Release ${{ github.ref_name }}
-
-        ## What's New
-        $tagMessage
-
-        ## Downloads
-        - **x64**: For modern 64-bit Windows (most common)
-        - **x86**: For older or 32-bit Windows  
-        - **portable**: Requires .NET 8 (smallest download)
-        "@
-        
         gh release create ${{ github.ref_name }} `
           --title "WinKeysRemapper ${{ github.ref_name }}" `
-          --notes $releaseNotes `
+          --notes "Release ${{ github.ref_name }}`n`n$tagMessage`n`n## Downloads`n- **x64**: For modern 64-bit Windows (most common)`n- **x86**: For older or 32-bit Windows`n- **portable**: Requires .NET 8 (smallest download)" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x64.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x86.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-portable.zip"
