@@ -8,16 +8,19 @@
     <UseWindowsForms>true</UseWindowsForms>
     
     <!-- Version Information -->
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0</AssemblyVersion>
-    <FileVersion>1.0.0</FileVersion>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0</AssemblyVersion>
+    <FileVersion>2.0.0</FileVersion>
+    
+    <!-- Auto-generate version from Git if available -->
+    <UseGitVersioning Condition="'$(GitVersion)' != ''">true</UseGitVersioning>
     
     <!-- Assembly Metadata -->
     <AssemblyTitle>WinKeysRemapper</AssemblyTitle>
-    <AssemblyDescription>High-performance Windows keyboard input remapper with application-specific targeting</AssemblyDescription>
+    <AssemblyDescription>Lightweight Windows tray application for remapping keyboard keys when specific applications are active</AssemblyDescription>
     <AssemblyCompany>eg3r</AssemblyCompany>
     <AssemblyProduct>WinKeysRemapper</AssemblyProduct>
-    <Copyright>Copyright  2025 eg3r</Copyright>
+    <Copyright>Copyright © 2025 eg3r</Copyright>
     
     <!-- Additional metadata for better identification -->
     <AssemblyInformationalVersion>$(Version)</AssemblyInformationalVersion>

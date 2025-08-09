@@ -25,6 +25,32 @@ jobs:
         echo "version=$version" >> $env:GITHUB_OUTPUT
         echo "Tag: $tag, Version: $version"
     
+    - name: Update project version
+      run: |
+        $version = "${{ steps.version.outputs.version }}"
+        $projectFile = "src/WinKeysRemapper.csproj"
+        
+        # Read the project file
+        $content = Get-Content $projectFile -Raw
+        
+        # Update version numbers
+        $content = $content -replace '<Version>[^<]*</Version>', "<Version>$version</Version>"
+        $content = $content -replace '<AssemblyVersion>[^<]*</AssemblyVersion>', "<AssemblyVersion>$version</AssemblyVersion>"
+        $content = $content -replace '<FileVersion>[^<]*</FileVersion>', "<FileVersion>$version</FileVersion>"
+        
+        # Write back to file
+        $content | Set-Content $projectFile -NoNewline
+        
+        echo "Updated project version to $version"
+    
+    - name: Commit version update
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add src/WinKeysRemapper.csproj
+        git commit -m "chore: update project version to ${{ steps.version.outputs.version }}" || echo "No changes to commit"
+        git push || echo "Nothing to push"
+    
     - name: Build x64
       run: dotnet publish src/WinKeysRemapper.csproj -c Release -r win-x64 --self-contained -o artifacts/win-x64 -p:Version=${{ steps.version.outputs.version }}
       
@@ -54,18 +80,44 @@ jobs:
         Compress-Archive -Path "artifacts/win-x86/*" -DestinationPath "WinKeysRemapper-${{ steps.version.outputs.version }}-x86.zip" -Force  
         Compress-Archive -Path "artifacts/portable/*" -DestinationPath "WinKeysRemapper-${{ steps.version.outputs.version }}-portable.zip" -Force
     
+    - name: Get tag message
+      id: tag_message
+      run: |
+        $tagMessage = git tag -l --format='%(contents)' "${{ github.ref_name }}"
+        # Remove empty lines and format
+        $tagMessage = $tagMessage | Where-Object { $_.Trim() -ne "" }
+        $formattedMessage = $tagMessage -join "`n"
+        
+        # Escape special characters for GitHub output
+        $escapedMessage = $formattedMessage -replace '"', '\"' -replace '`', '\`'
+        
+        echo "message=$escapedMessage" >> $env:GITHUB_OUTPUT
+        echo "Tag message: $escapedMessage"
+    
     - name: Create Release
       run: |
+        $tagMessage = "${{ steps.tag_message.outputs.message }}"
+        
+        # Build release notes with tag message
         $releaseNotes = @"
         Release ${{ github.ref_name }}
 
-        ## 🛡️ Windows Security Warning
+        ## � What's New
+        $tagMessage
+
+        ## �🛡️ Windows Security Warning
         Windows may show a security warning when running downloaded software. This is normal for unsigned applications. See the included documentation for instructions on how to safely run WinKeysRemapper.
 
         ## 📥 Downloads
         - **x64**: For modern 64-bit Windows (most common)
         - **x86**: For older or 32-bit Windows  
         - **portable**: Requires .NET 8 (smallest download)
+
+        ## 📖 Documentation
+        Each download includes:
+        - `README.md` - Complete usage guide
+        - `installation.md` - Setup instructions
+        - `windows-security-warning.md` - Security guidance
         "@
         
         gh release create ${{ github.ref_name }} `
