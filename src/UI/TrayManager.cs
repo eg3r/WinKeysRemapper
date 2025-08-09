@@ -1,177 +1,112 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Drawing;
 using System.IO;
-using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using Microsoft.Win32;
-using System.Reflection;
 using WinKeysRemapper.Configuration;
 using WinKeysRemapper.Input;
+using WinKeysRemapper.UI.Services;
 
 namespace WinKeysRemapper.UI
 {
-    public class TrayManager : IDisposable
+    public class TrayManager : Form
     {
-        private NotifyIcon? _notifyIcon;
-        private ContextMenuStrip? _contextMenu;
-        private ConfigurationManager _configManager;
-        private StartupManager _startupManager;
-        private LowLevelKeyboardHook? _keyboardHook;
-        private KeyMappingConfig? _config;
+        private readonly ConfigurationManager _configManager;
+        private readonly ApplicationMonitor _applicationMonitor;
+        private readonly HookManager _hookManager;
+        private readonly TrayIconManager _trayIconManager;
+        private readonly NotificationService _notificationService;
         private readonly bool _isStartupMode;
+
+        private KeyMappingConfig? _config;
+        private Dictionary<int, int>? _keyMappings;
+        private string? _targetApplication;
 
         public TrayManager(bool isStartupMode = false)
         {
+            // Initialize as a hidden form for proper Windows Forms context
+            WindowState = FormWindowState.Minimized;
+            ShowInTaskbar = false;
+            Visible = false;
+            
+            // Force handle creation so InvokeRequired works properly
+            var handle = this.Handle;
+            
             _isStartupMode = isStartupMode;
             _configManager = new ConfigurationManager();
-            _startupManager = new StartupManager();
-            InitializeTrayIcon();
-            LoadConfigAndStartHook();
+            
+            var startupManager = new StartupManager();
+            
+            // Initialize services
+            _applicationMonitor = new ApplicationMonitor();
+            _hookManager = new HookManager(this);
+            _trayIconManager = new TrayIconManager(startupManager);
+            
+            // Initialize tray icon first to get NotifyIcon for notifications
+            _trayIconManager.Initialize();
+            _notificationService = new NotificationService(_trayIconManager.NotifyIcon, _isStartupMode);
+            
+            // Wire up events
+            WireUpEvents();
+            
+            LoadConfigAndStartMonitoring();
         }
 
-        private void InitializeTrayIcon()
+        private void WireUpEvents()
         {
-            _contextMenu = new ContextMenuStrip();
+            // Application monitor events
+            _applicationMonitor.TargetApplicationActivated += OnTargetApplicationActivated;
+            _applicationMonitor.TargetApplicationDeactivated += OnTargetApplicationDeactivated;
             
-            var reloadMenuItem = new ToolStripMenuItem("Reload Config");
-            reloadMenuItem.Click += OnReloadConfig;
-            reloadMenuItem.Image = CreateMenuIcon("🔄");
+            // Hook manager events
+            _hookManager.HookActivated += OnHookActivated;
+            _hookManager.HookDeactivated += OnHookDeactivated;
+            _hookManager.HookError += OnHookError;
             
-            var openConfigMenuItem = new ToolStripMenuItem("Open Config");
-            openConfigMenuItem.Click += OnOpenConfig;
-            openConfigMenuItem.Image = CreateMenuIcon("📝");
-            
-            var startupMenuItem = new ToolStripMenuItem("Start with Windows");
-            startupMenuItem.Click += OnToggleStartup;
-            startupMenuItem.CheckOnClick = true;
-            startupMenuItem.Checked = _startupManager.IsStartupEnabled();
-            startupMenuItem.Image = CreateMenuIcon("🚀");
-            
-            var exitMenuItem = new ToolStripMenuItem("Exit");
-            exitMenuItem.Click += OnExit;
-            exitMenuItem.Image = CreateMenuIcon("❌");
-            
-            _contextMenu.Items.Add(reloadMenuItem);
-            _contextMenu.Items.Add(openConfigMenuItem);
-            _contextMenu.Items.Add(startupMenuItem);
-            _contextMenu.Items.Add(new ToolStripSeparator());
-            _contextMenu.Items.Add(exitMenuItem);
-
-            _notifyIcon = new NotifyIcon
-            {
-                Icon = CreateIcon(),
-                Text = "WinKeysRemapper",
-                ContextMenuStrip = _contextMenu,
-                Visible = true
-            };
-
-            _notifyIcon.DoubleClick += OnDoubleClick;
+            // Tray icon events
+            _trayIconManager.ReloadConfigRequested += OnReloadConfig;
+            _trayIconManager.OpenConfigRequested += OnOpenConfig;
+            _trayIconManager.ToggleStartupRequested += OnToggleStartup;
+            _trayIconManager.ExitRequested += OnExit;
         }
 
-        private Icon CreateIcon()
+        private void OnTargetApplicationActivated(string processName)
         {
-            var bitmap = new Bitmap(32, 32);
-            using (var graphics = Graphics.FromImage(bitmap))
+            if (_keyMappings != null && _targetApplication != null)
             {
-                graphics.Clear(Color.Transparent);
-                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                
-                var rect = new Rectangle(4, 8, 24, 16);
-                var keyboardBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
-                    rect, Color.FromArgb(70, 130, 180), Color.FromArgb(25, 25, 112), 45f);
-                
-                graphics.FillRoundedRectangle(keyboardBrush, rect, 3);
-                graphics.DrawRoundedRectangle(new Pen(Color.FromArgb(50, 50, 50), 1), rect, 3);
-                
-                var keyBrush = new SolidBrush(Color.FromArgb(220, 220, 220));
-                graphics.FillRectangle(keyBrush, 7, 11, 3, 2);
-                graphics.FillRectangle(keyBrush, 11, 11, 3, 2);
-                graphics.FillRectangle(keyBrush, 15, 11, 3, 2);
-                graphics.FillRectangle(keyBrush, 19, 11, 3, 2);
-                
-                graphics.FillRectangle(keyBrush, 7, 14, 4, 2);
-                graphics.FillRectangle(keyBrush, 12, 14, 4, 2);
-                graphics.FillRectangle(keyBrush, 17, 14, 4, 2);
-                
-                var arrowPen = new Pen(Color.FromArgb(255, 215, 0), 2);
-                graphics.DrawLine(arrowPen, 24, 4, 28, 4);
-                graphics.DrawLine(arrowPen, 26, 2, 28, 4);
-                graphics.DrawLine(arrowPen, 26, 6, 28, 4);
-                
-                keyboardBrush.Dispose();
-                keyBrush.Dispose();
-                arrowPen.Dispose();
+                _hookManager.CreateHook(_keyMappings, _targetApplication);
             }
-            
-            return Icon.FromHandle(bitmap.GetHicon());
         }
 
-        private Bitmap CreateMenuIcon(string emoji)
+        private void OnTargetApplicationDeactivated(string processName)
         {
-            var bitmap = new Bitmap(16, 16);
-            using (var graphics = Graphics.FromImage(bitmap))
-            {
-                graphics.Clear(Color.Transparent);
-                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-                
-                try
-                {
-                    using (var font = new Font("Segoe UI Emoji", 10, FontStyle.Regular))
-                    {
-                        var textSize = graphics.MeasureString(emoji, font);
-                        var x = (16 - textSize.Width) / 2;
-                        var y = (16 - textSize.Height) / 2;
-                        graphics.DrawString(emoji, font, Brushes.Black, x, y);
-                    }
-                }
-                catch
-                {
-                    switch (emoji)
-                    {
-                        case "🔄":
-                            graphics.DrawEllipse(new Pen(Color.Blue, 2), 2, 2, 12, 12);
-                            graphics.DrawLine(new Pen(Color.Blue, 2), 8, 2, 10, 4);
-                            graphics.DrawLine(new Pen(Color.Blue, 2), 10, 4, 8, 6);
-                            break;
-                        case "📝":
-                            graphics.FillRectangle(Brushes.White, 3, 2, 8, 11);
-                            graphics.DrawRectangle(Pens.Black, 3, 2, 8, 11);
-                            graphics.DrawLine(new Pen(Color.Blue, 1), 5, 5, 9, 5);
-                            graphics.DrawLine(new Pen(Color.Blue, 1), 5, 7, 9, 7);
-                            graphics.DrawLine(new Pen(Color.Blue, 1), 5, 9, 7, 9);
-                            break;
-                        case "❌":
-                            graphics.DrawLine(new Pen(Color.Red, 2), 4, 4, 12, 12);
-                            graphics.DrawLine(new Pen(Color.Red, 2), 12, 4, 4, 12);
-                            break;
-                        case "🚀":
-                            var points = new Point[] {
-                                new Point(8, 2), new Point(10, 6), new Point(9, 10),
-                                new Point(8, 12), new Point(7, 10), new Point(6, 6)
-                            };
-                            graphics.FillPolygon(Brushes.Orange, points);
-                            graphics.DrawPolygon(new Pen(Color.DarkOrange, 1), points);
-                            graphics.FillEllipse(Brushes.Red, 7, 12, 2, 3);
-                            break;
-                    }
-                }
-            }
-            return bitmap;
+            _hookManager.DestroyHook();
         }
 
-        private void LoadConfigAndStartHook()
+        private void OnHookActivated(string targetApplication)
+        {
+            _notificationService.ShowHookActivated(targetApplication);
+        }
+
+        private void OnHookDeactivated()
+        {
+            _notificationService.ShowHookDeactivated();
+        }
+
+        private void OnHookError(string message)
+        {
+            _notificationService.ShowHookError(message);
+        }
+
+        private void LoadConfigAndStartMonitoring()
         {
             try
             {
                 _config = _configManager.LoadConfig();
                 
-                _keyboardHook?.Dispose();
-                
-                var keyMappings = new Dictionary<int, int>();
-                var targetApplications = new HashSet<string> { _config.TargetApplication };
+                // Parse key mappings once and store in memory
+                _keyMappings = new Dictionary<int, int>();
+                _targetApplication = _config.TargetApplication;
                 
                 var successfulMappings = 0;
                 foreach (var mapping in _config.KeyMappings)
@@ -179,36 +114,55 @@ namespace WinKeysRemapper.UI
                     if (VirtualKeyParser.TryParseVirtualKey(mapping.Key, out int fromKey) && 
                         VirtualKeyParser.TryParseVirtualKey(mapping.Value, out int toKey))
                     {
-                        keyMappings[fromKey] = toKey;
+                        _keyMappings[fromKey] = toKey;
                         successfulMappings++;
                     }
                 }
                 
-                _keyboardHook = LowLevelKeyboardHook.CreateInstance(keyMappings, targetApplications);
-                _keyboardHook.InstallHook();
+                // Start application monitoring
+                _applicationMonitor.StartMonitoring(_targetApplication, TimeSpan.FromSeconds(2));
                 
-                if (!_isStartupMode)
-                {
-                    ShowBalloonTip("WinKeysRemapper Started", 
-                        $"Monitoring: {_config.TargetApplication}\n" +
-                        $"Mappings: {successfulMappings}/{_config.KeyMappings.Count} keys parsed successfully", 
-                        ToolTipIcon.Info);
-                }
+                _notificationService.ShowConfigurationLoaded(_targetApplication, successfulMappings, _config.KeyMappings.Count);
             }
             catch (Exception ex)
             {
-                if (_isStartupMode)
+                _notificationService.ShowConfigurationError($"Failed to load config: {ex.Message}");
+            }
+        }
+        
+        private void ReloadConfig()
+        {
+            try
+            {
+                _config = _configManager.LoadConfig();
+                
+                var newKeyMappings = new Dictionary<int, int>();
+                var newTargetApplication = _config.TargetApplication;
+                
+                var successfulMappings = 0;
+                foreach (var mapping in _config.KeyMappings)
                 {
-                    ShowBalloonTip("WinKeysRemapper Error", 
-                        "Failed to load configuration", 
-                        ToolTipIcon.Error);
+                    if (VirtualKeyParser.TryParseVirtualKey(mapping.Key, out int fromKey) && 
+                        VirtualKeyParser.TryParseVirtualKey(mapping.Value, out int toKey))
+                    {
+                        newKeyMappings[fromKey] = toKey;
+                        successfulMappings++;
+                    }
                 }
-                else
-                {
-                    ShowBalloonTip("Configuration Error", 
-                        $"Failed to load config: {ex.Message}", 
-                        ToolTipIcon.Error);
-                }
+                
+                // Update stored configuration
+                _keyMappings = newKeyMappings;
+                _targetApplication = newTargetApplication;
+                
+                // If target app changed, restart monitoring
+                _hookManager.DestroyHook();
+                _applicationMonitor.StartMonitoring(_targetApplication, TimeSpan.FromSeconds(2));
+                
+                _notificationService.ShowConfigurationReloaded(_targetApplication, successfulMappings, _config.KeyMappings.Count);
+            }
+            catch (Exception ex)
+            {
+                _notificationService.ShowReloadError($"Failed to reload config: {ex.Message}");
             }
         }
 
@@ -216,13 +170,11 @@ namespace WinKeysRemapper.UI
         {
             try
             {
-                LoadConfigAndStartHook();
+                ReloadConfig();
             }
             catch (Exception ex)
             {
-                ShowBalloonTip("Reload Failed", 
-                    $"Failed to reload config: {ex.Message}", 
-                    ToolTipIcon.Error);
+                _notificationService.ShowReloadError($"Failed to reload config: {ex.Message}");
             }
         }
 
@@ -234,7 +186,7 @@ namespace WinKeysRemapper.UI
                 
                 if (File.Exists(configPath))
                 {
-                    Process.Start(new ProcessStartInfo
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = configPath,
                         UseShellExecute = true
@@ -242,41 +194,40 @@ namespace WinKeysRemapper.UI
                 }
                 else
                 {
-                    ShowBalloonTip("Config Not Found", 
-                        "Configuration file not found. It will be created when the application starts.", 
-                        ToolTipIcon.Warning);
+                    _notificationService.ShowConfigFileError("Config file not found.");
                 }
             }
             catch (Exception ex)
             {
-                ShowBalloonTip("Open Failed", 
-                    $"Failed to open config file: {ex.Message}", 
-                    ToolTipIcon.Error);
+                _notificationService.ShowConfigFileError($"Failed to open config file: {ex.Message}");
             }
         }
 
-        private void OnToggleStartup(object? sender, EventArgs e)
+        private async void OnToggleStartup(object? sender, EventArgs e)
         {
-            var menuItem = sender as ToolStripMenuItem;
-            if (menuItem == null) return;
-
             try
             {
-                if (menuItem.Checked)
+                // Run the startup toggle operation on a background thread
+                await Task.Run(() =>
                 {
-                    _startupManager.EnableStartup();
-                }
-                else
-                {
-                    _startupManager.DisableStartup();
-                }
+                    var startupManager = new StartupManager();
+                    if (startupManager.IsStartupEnabled())
+                    {
+                        startupManager.DisableStartup();
+                    }
+                    else
+                    {
+                        startupManager.EnableStartup();
+                    }
+                });
+
+                // No need to update checkbox - it was already toggled for immediate feedback
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to toggle startup: {ex.Message}", "Error", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                
-                menuItem.Checked = !menuItem.Checked;
+                // If operation failed, revert the checkbox state
+                _trayIconManager.UpdateStartupCheckboxState();
+                _notificationService.ShowStartupToggleError($"Failed to toggle startup: {ex.Message}");
             }
         }
 
@@ -285,58 +236,15 @@ namespace WinKeysRemapper.UI
             Application.Exit();
         }
 
-        private void OnDoubleClick(object? sender, EventArgs e)
+        protected override void Dispose(bool disposing)
         {
-            var status = _config != null 
-                ? $"Status: Running\nTarget: {_config.TargetApplication}\nMappings: {_config.KeyMappings.Count}"
-                : "Status: Configuration not loaded";
-                
-            ShowBalloonTip("WinKeysRemapper Status", status, ToolTipIcon.Info);
-        }
-
-        private void ShowBalloonTip(string title, string text, ToolTipIcon icon)
-        {
-            _notifyIcon?.ShowBalloonTip(3000, title, text, icon);
-        }
-
-        public void Dispose()
-        {
-            _keyboardHook?.Dispose();
-            _notifyIcon?.Dispose();
-            _contextMenu?.Dispose();
-        }
-    }
-
-    public static class GraphicsExtensions
-    {
-        public static void FillRoundedRectangle(this Graphics graphics, Brush brush, Rectangle rectangle, int radius)
-        {
-            using (var path = CreateRoundedRectanglePath(rectangle, radius))
+            if (disposing)
             {
-                graphics.FillPath(brush, path);
+                _applicationMonitor?.Dispose();
+                _hookManager?.Dispose();
+                _trayIconManager?.Dispose();
             }
-        }
-
-        public static void DrawRoundedRectangle(this Graphics graphics, Pen pen, Rectangle rectangle, int radius)
-        {
-            using (var path = CreateRoundedRectanglePath(rectangle, radius))
-            {
-                graphics.DrawPath(pen, path);
-            }
-        }
-
-        private static System.Drawing.Drawing2D.GraphicsPath CreateRoundedRectanglePath(Rectangle rectangle, int radius)
-        {
-            var path = new System.Drawing.Drawing2D.GraphicsPath();
-            int diameter = radius * 2;
-
-            path.AddArc(rectangle.X, rectangle.Y, diameter, diameter, 180, 90);
-            path.AddArc(rectangle.Right - diameter, rectangle.Y, diameter, diameter, 270, 90);
-            path.AddArc(rectangle.Right - diameter, rectangle.Bottom - diameter, diameter, diameter, 0, 90);
-            path.AddArc(rectangle.X, rectangle.Bottom - diameter, diameter, diameter, 90, 90);
-            path.CloseFigure();
-
-            return path;
+            base.Dispose(disposing);
         }
     }
 }

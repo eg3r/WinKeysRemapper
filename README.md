@@ -5,49 +5,17 @@
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 [![GitHub release](https://img.shields.io/github/v/release/eg3r/WinKeysRemapper)](https://github.com/eg3r/WinKeysRemapper/releases/latest)
 
-A high-performance Windows keyboard input remapper that allows you to remap specific keys for targeted applications. Built with PowerToys-inspired architecture for minimal system impact.
+A lightweight Windows tray application for remapping keyboard keys when specific applications are active.
 
 ## ✨ Features
 
-- 🎯 **Application-Specific Remapping** - Target specific applications without affecting system-wide behavior
-- ⚡ **High Performance** - PowerToys-inspired architecture with minimal CPU and memory overhead
-- 🔧 **Comprehensive Key Support** - 200+ supported keys including function keys, media keys, numpad, and symbols
-- 📝 **JSON Configuration** - Easy-to-edit configuration files
-- 🚀 **Low-Level Hooks** - Direct Windows API integration for reliable key interception
-- 🛡️ **Background Processing** - Optimized hook callbacks with background process detection
-- 🎮 **System Tray Interface** - Runs quietly in the background with easy access via system tray
-- 🏁 **Auto-Startup** - Optional automatic startup with Windows via registry integration
+- 🎯 **Application-Specific Remapping** - Key remapping only activates when your target application is in focus
+- ⚡ **Dynamic Hook Management** - Automatically enables/disables based on application focus  
+- 🛡️ **System Tray Integration** - Runs quietly in the background with tray icon controls
+- 🏁 **Windows Startup Support** - Can auto-start with Windows (configurable)
+- 📝 **Real-time Configuration** - Reload settings without restarting the application
 
-## 🚀 Quick Start
-
-### Prerequisites
-- Windows 10/11
-- .NET 8.0 Runtime
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/eg3r/WinKeysRemapper.git
-   cd WinKeysRemapper
-   ```
-
-2. **Build the project:**
-   ```bash
-   dotnet build src/WinKeysRemapper.csproj
-   ```
-
-3. **Run the application:**
-   ```bash
-   dotnet run --project src/WinKeysRemapper.csproj
-   ```
-
-### Quick Build Script
-```bash
-./build.bat
-```
-
-## 🖥️ User Interface
+## ️ User Interface
 
 WinKeysRemapper features a clean system tray interface that keeps it running quietly in the background:
 
@@ -67,29 +35,6 @@ WinKeysRemapper features a clean system tray interface that keeps it running qui
 - Edit your `key_mappings.json` file with any text editor
 - Use the "Reload Configuration" option from the tray menu to apply changes instantly
 - No need to restart the application when updating key mappings
-
-## 📁 Project Structure
-
-```
-WinKeysRemapper/
-├── src/                          # Source code
-│   ├── Configuration/            # Configuration management
-│   │   └── ConfigurationManager.cs
-│   ├── Input/                    # Input handling and keyboard hooks
-│   │   ├── LowLevelKeyboardHook.cs
-│   │   └── VirtualKeyParser.cs
-│   ├── UI/                       # User interface components
-│   │   └── TrayManager.cs        # System tray management
-│   ├── Program.cs               # Application entry point
-│   └── WinKeysRemapper.csproj   # Project file
-├── config/                      # Configuration files
-│   └── key_mappings_example.json
-├── docs/                       # Documentation
-│   └── README.md              # Detailed documentation
-├── LICENSE                     # MIT License
-├── README.md                   # This file
-└── WinKeysRemapper.sln        # Solution file
-```
 
 ## ⚙️ Configuration
 
@@ -125,22 +70,82 @@ The remapper supports 200+ keys including:
 - **Special Keys:** Space, Enter, Escape, Tab, etc.
 - **Symbols:** Punctuation and special characters
 
-## 🏗️ Architecture
+## 🚀 Download & Installation
 
-### PowerToys-Inspired Design
+### For Users
+
+1. **Download the latest release:**
+   - Visit the [Releases page](https://github.com/eg3r/WinKeysRemapper/releases/latest)
+   - Download `WinKeysRemapper.exe` from the latest release
+   - No installation required - it's a portable executable
+
+2. **Run the application:**
+   - Right-click `WinKeysRemapper.exe` and select "Run as administrator"
+   - The application will appear in your system tray
+   - A default `key_mappings.json` file will be created automatically
+
+3. **Configure your key mappings:**
+   - Right-click the tray icon → "Open Config"
+   - Edit the JSON file to set your target application and key mappings
+   - Right-click the tray icon → "Reload Configuration" to apply changes
+
+### Prerequisites
+- Windows 10/11
+- Administrator privileges (required for keyboard hooks)
+- .NET 8.0 Runtime (automatically installed on most Windows systems)
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🐛 Issues
+
+If you encounter any issues or have feature requests, please [open an issue](https://github.com/eg3r/WinKeysRemapper/issues) on GitHub.
+
+---
+
+## 🛠️ Development
+
+### 📁 Project Structure
+
+```
+WinKeysRemapper/
+├── src/                          # Source code
+│   ├── Configuration/            # Configuration management
+│   ├── Input/                    # Keyboard hooks and input handling
+│   ├── UI/                       # User interface components
+│   │   └── Services/             # Service layer classes
+│   ├── Program.cs
+│   └── WinKeysRemapper.csproj
+├── config/                       # Example configuration files
+├── docs/                         # Documentation
+├── build.bat                     # Build script
+├── key_mappings.json             # Runtime configuration
+├── LICENSE
+└── README.md
+```
+
+### 🏗️ Architecture
+
+#### PowerToys-Inspired Design
 - **Background Process Detection** - Expensive operations moved out of hook callbacks
 - **Event Flagging System** - Prevents infinite loops and duplicate events
 - **Timer-Based Optimization** - Process checking on background threads
 - **Early Return Patterns** - Minimal processing in hot paths
 
-### Performance Features
+#### Performance Features
 - **Pre-normalized Keys** - Configuration keys normalized once during loading
 - **Optimized Hook Callbacks** - Minimal allocations and processing
 - **Target Application Filtering** - Only active when target application has focus
 
-## 🛠️ Development
-
 ### Building from Source
+
+#### Prerequisites for Development
+- Windows 10/11
+- .NET 8.0 SDK
+- Visual Studio 2022 or VS Code
+
+#### Build Commands
 ```bash
 # Clone and build
 git clone https://github.com/eg3r/WinKeysRemapper.git
@@ -154,21 +159,18 @@ dotnet test
 dotnet build src/WinKeysRemapper.csproj -c Release
 ```
 
+#### Quick Build Script
+```bash
+./build.bat
+```
+
 ### VS Code Support
 The project includes VS Code tasks for building and running:
 - `Ctrl+Shift+P` → "Tasks: Run Task" → "build" or "run"
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-## 🐛 Issues
-
-If you encounter any issues or have feature requests, please [open an issue](https://github.com/eg3r/WinKeysRemapper/issues) on GitHub.
 
 ## 🙏 Acknowledgments
 
