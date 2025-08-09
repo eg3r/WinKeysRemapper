@@ -56,7 +56,7 @@ The application uses JSON configuration files. On first run, it creates a defaul
 **Configuration Notes:**
 - The configuration file is created automatically in the same directory as the executable
 - Use the system tray "Reload Configuration" option to apply changes without restarting
-- The `TargetApplication` field supports partial process name matching (e.g., "hoi4" matches "Hearts of Iron IV")
+- The `TargetApplication` field supports partial process name matching (e.g., "note" matches "notepad")
 
 ### Supported Keys
 
