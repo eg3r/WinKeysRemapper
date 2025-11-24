@@ -58,34 +58,13 @@ jobs:
         $version = "${{ github.ref_name }}"
         $tagMessage = "${{ steps.tag_message.outputs.message }}"
         
-        # Create clean release notes with tag message
-        echo "Release $version" > release-notes.md
-        echo "" >> release-notes.md
-        echo "## 🎯 What's New" >> release-notes.md
-        echo "$tagMessage" >> release-notes.md
-        echo "" >> release-notes.md
-        echo "## 🛡️ Windows Security Warning" >> release-notes.md
-        echo "Windows may show a security warning when running downloaded software. This is normal for unsigned applications." >> release-notes.md
-        echo "" >> release-notes.md
-        echo "## 📥 Downloads" >> release-notes.md
-        echo "- **x64**: For modern 64-bit Windows (most common)" >> release-notes.md
-        echo "- **x86**: For older or 32-bit Windows" >> release-notes.md
-        echo "- **portable**: Requires .NET 8 (smallest download)" >> release-notes.md
-        echo "" >> release-notes.md
-        echo "## 📖 Documentation" >> release-notes.md
-        echo "Each download includes:" >> release-notes.md
-        echo "- Complete usage guide" >> release-notes.md
-        echo "- Setup instructions" >> release-notes.md
-        echo "- Security guidance" >> release-notes.md
+        # URL encode the tag message for inline notes
+        $encodedTagMessage = [System.Web.HttpUtility]::UrlEncode($tagMessage)
         
-        # Show the content for debugging
-        Write-Host "Release notes content:"
-        Get-Content release-notes.md
-        
-        # Create release using the file
+        # Create release with URL-encoded notes
         gh release create ${{ github.ref_name }} `
           --title "WinKeysRemapper ${{ github.ref_name }}" `
-          --notes-file "release-notes.md" `
+          --notes "Release $version%0A%0A## 🎯 What's New%0A$encodedTagMessage%0A%0A## 🛡️ Windows Security Warning%0AWindows may show a security warning when running downloaded software. This is normal for unsigned applications.%0A%0A## 📥 Downloads%0A- **x64**: For modern 64-bit Windows (most common)%0A- **x86**: For older or 32-bit Windows%0A- **portable**: Requires .NET 8 (smallest download)%0A%0A## 📖 Documentation%0AEach download includes:%0A- Complete usage guide%0A- Setup instructions%0A- Security guidance" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x64.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-x86.zip" `
           "WinKeysRemapper-${{ steps.version.outputs.version }}-portable.zip"
