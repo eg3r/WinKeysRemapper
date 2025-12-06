@@ -324,11 +324,8 @@ namespace WinKeysRemapper.Input
 
             try
             {
-                IntPtr targetWindow = FindWindow(null!, "Hearts of Iron IV");
-                if (targetWindow == IntPtr.Zero)
-                {
-                    targetWindow = GetForegroundWindow();
-                }
+                // Use the foreground window directly since we only remap when the target app is active
+                IntPtr targetWindow = GetForegroundWindow();
 
                 if (targetWindow != IntPtr.Zero)
                 {
