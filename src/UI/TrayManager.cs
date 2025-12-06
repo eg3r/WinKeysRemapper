@@ -120,7 +120,7 @@ namespace WinKeysRemapper.UI
                 }
                 
                 // Start application monitoring
-                _applicationMonitor.StartMonitoring(_targetApplication, TimeSpan.FromSeconds(2));
+                _applicationMonitor.StartMonitoring(_targetApplication);
                 
                 _notificationService.ShowConfigurationLoaded(_targetApplication, successfulMappings, _config.KeyMappings.Count);
             }
@@ -156,7 +156,7 @@ namespace WinKeysRemapper.UI
                 
                 // If target app changed, restart monitoring
                 _hookManager.DestroyHook();
-                _applicationMonitor.StartMonitoring(_targetApplication, TimeSpan.FromSeconds(2));
+                _applicationMonitor.StartMonitoring(_targetApplication);
                 
                 _notificationService.ShowConfigurationReloaded(_targetApplication, successfulMappings, _config.KeyMappings.Count);
             }

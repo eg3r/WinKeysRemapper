@@ -1,17 +1,28 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace WinKeysRemapper.UI.Services
 {
     public class ApplicationMonitor : IDisposable
     {
-        private System.Threading.Timer? _monitorTimer;
+        private IntPtr _hookHandle = IntPtr.Zero;
+        private WinEventDelegate? _winEventDelegate;
         private volatile bool _isTargetActive = false;
         private string? _targetApplication;
 
-        // Windows API for process monitoring
+        // Windows API
+        private const uint WINEVENT_OUTOFCONTEXT = 0;
+        private const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+
+        private delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr hmodWinEventProc, WinEventDelegate lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
+
+        [DllImport("user32.dll")]
+        private static extern bool UnhookWinEvent(IntPtr hWinEventHook);
+
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
@@ -24,30 +35,45 @@ namespace WinKeysRemapper.UI.Services
         public bool IsTargetActive => _isTargetActive;
         public string? TargetApplication => _targetApplication;
 
-        public void StartMonitoring(string targetApplication, TimeSpan interval)
+        public void StartMonitoring(string targetApplication)
         {
             _targetApplication = targetApplication?.ToLowerInvariant();
             
-            _monitorTimer?.Dispose();
-            _monitorTimer = new System.Threading.Timer(MonitorForegroundApplication, null, 
-                TimeSpan.Zero, interval);
+            StopMonitoring();
+
+            _winEventDelegate = new WinEventDelegate(WinEventProc);
+            _hookHandle = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, _winEventDelegate, 0, 0, WINEVENT_OUTOFCONTEXT);
+
+            // Check immediately once
+            CheckForegroundWindow(GetForegroundWindow());
         }
 
         public void StopMonitoring()
         {
-            _monitorTimer?.Dispose();
-            _monitorTimer = null;
+            if (_hookHandle != IntPtr.Zero)
+            {
+                UnhookWinEvent(_hookHandle);
+                _hookHandle = IntPtr.Zero;
+            }
+            _winEventDelegate = null;
         }
 
-        private void MonitorForegroundApplication(object? state)
+        private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
+        {
+            if (eventType == EVENT_SYSTEM_FOREGROUND)
+            {
+                CheckForegroundWindow(hwnd);
+            }
+        }
+
+        private void CheckForegroundWindow(IntPtr hwnd)
         {
             try
             {
-                var hwnd = GetForegroundWindow();
                 if (hwnd == IntPtr.Zero) return;
 
                 GetWindowThreadProcessId(hwnd, out uint processId);
-                var process = Process.GetProcessById((int)processId);
+                using var process = Process.GetProcessById((int)processId);
                 var processName = process.ProcessName.ToLowerInvariant();
 
                 bool isCurrentlyActive = !string.IsNullOrEmpty(_targetApplication) && 
@@ -67,7 +93,7 @@ namespace WinKeysRemapper.UI.Services
             }
             catch
             {
-                // Ignore errors in background monitoring
+                // Ignore errors (e.g. process accessing issues)
                 if (_isTargetActive)
                 {
                     _isTargetActive = false;
@@ -78,7 +104,7 @@ namespace WinKeysRemapper.UI.Services
 
         public void Dispose()
         {
-            _monitorTimer?.Dispose();
+            StopMonitoring();
         }
     }
 }
